@@ -1,0 +1,22 @@
+# Gradle / Android build output
+**/build/
+**/.gradle/
+**/.kotlin/
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+
+# Toolchain (installed binaries, not project source)
+toolchain/
+
+# Upstream references (read-only reference code, not this project)
+oh-my-claudecode/
+oh-my-claudecode-port/
+
+# OS noise
+.DS_Store
+Thumbs.db

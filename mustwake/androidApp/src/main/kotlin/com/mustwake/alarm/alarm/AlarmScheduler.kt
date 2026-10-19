@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.mustwake.alarm.MainActivity
+import com.mustwake.alarm.RingingActivity
 import com.mustwake.alarm.data.alarm.NextTriggerCalculator
 import com.mustwake.alarm.data.db.AlarmEntity
 import com.mustwake.alarm.data.db.AlarmEventType
@@ -148,9 +148,9 @@ class AlarmScheduler(
     }
 
     private fun showPendingIntent(alarmId: Long): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java)
+        // Opens the ringing screen; it loads label/time from the database by alarm id.
+        val intent = RingingActivity.intent(context, alarmId, "", 0, 0, 0)
             .setAction(ACTION_SHOW_RINGING)
-            .putExtra(AlarmReceiver.EXTRA_ALARM_ID, alarmId)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         return PendingIntent.getActivity(
             context,

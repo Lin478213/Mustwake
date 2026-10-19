@@ -10,6 +10,9 @@ local.properties
 *.iml
 captures/
 
+# Local agent metadata (memory logs)
+.workbuddy/
+
 # Toolchain (installed binaries, not project source)
 toolchain/
 

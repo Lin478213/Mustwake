@@ -128,6 +128,38 @@ class AlarmSchedulerTest {
     }
 
     @Test
+    fun `snooze does not replace the regular registration`() = runTest {
+        scheduler.schedule(alarm(hour = 7, minute = 0))
+        val snoozeAt = now.plusSeconds(300)
+
+        scheduler.scheduleSnooze(alarmId = 1L, triggerAt = snoozeAt, steps = 10, snoozeCount = 1)
+
+        assertEquals(2, scheduledTriggerTimes().size)
+        assertTrue(scheduledTriggerTimes().contains(snoozeAt.toEpochMilli()))
+        assertTrue(scheduledTriggerTimes().contains(localMillis(7, 0)))
+    }
+
+    @Test
+    fun `cancel removes both the alarm and its snooze`() = runTest {
+        scheduler.schedule(alarm())
+        scheduler.scheduleSnooze(alarmId = 1L, triggerAt = now.plusSeconds(300), steps = 1, snoozeCount = 1)
+
+        scheduler.cancel(1L)
+
+        assertTrue(scheduledTriggerTimes().isEmpty())
+    }
+
+    @Test
+    fun `cancelSnooze keeps the regular registration`() = runTest {
+        scheduler.schedule(alarm())
+        scheduler.scheduleSnooze(alarmId = 1L, triggerAt = now.plusSeconds(300), steps = 1, snoozeCount = 1)
+
+        scheduler.cancelSnooze(1L)
+
+        assertEquals(listOf(localMillis(7, 0)), scheduledTriggerTimes())
+    }
+
+    @Test
     fun `exactness matches the platform capability`() = runTest {
         val outcome = scheduler.schedule(alarm())
 

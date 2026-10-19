@@ -1,7 +1,7 @@
 # MustWake 交接文档
 
-> 交接时间：2026-10-19 14:03（UTC+8），T1–T3 完成后更新于 14:41
-> 交接状态：**T3 完成，T4 未开始**
+> 交接时间：2026-10-19 14:03（UTC+8），T1–T4 完成后更新于 14:49
+> 交接状态：**T4 完成，T5 未开始**
 > 工作区：`E:\MustWake`（已是 git 仓库）
 > 项目：`E:\MustWake\mustwake`
 > 工具链：`E:\MustWake\toolchain`
@@ -11,10 +11,10 @@
 ## 1. 一页结论
 
 - 目标：Android 步数闹钟。到点响铃后，必须走到目标步数才能停止；MIUIX 风格；设置里两个独立开关控制悬浮底栏与液态玻璃。
-- 当前完成了 **T0 工具链**、**T1 数据层**、**T2 调度与权限**、**T3 响铃服务**：Room v2 + DataStore + Repository + `AlarmScheduler` + Boot 恢复 + 前台服务（音频/振动/唤醒锁/全屏通知）+ 全屏响铃页，86 个 JVM 测试全过。
-- 下一步是 **T4 步数与停止策略**：`StepSensorRepository`（STEP_COUNTER 基线 / STEP_DETECTOR 降级）、`StopPolicy`、snooze、紧急停止、摇晃降级。**当前停止按钮不校验步数，只记录 CANCELLED。**
+- 当前完成了 **T0 工具链**、**T1 数据层**、**T2 调度与权限**、**T3 响铃服务**、**T4 步数与停止策略**：Room v2 + DataStore + 调度/Boot 恢复 + 前台服务 + 计步基线/降级 + `StopPolicy` + snooze + 紧急停止 + 摇晃降级，115 个 JVM 测试全过。
+- 下一步是 **T5 MIUIX 界面骨架**：列表/编辑/响铃/设置/历史/引导页，响铃页替换掉当前程序化布局。
 - 当前没有连接 Android 设备，APK 尚未安装/运行；真机验收是 T8 的事。
-- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
 
 ---
 
@@ -133,7 +133,8 @@ E:\MustWake\mustwake\
 │  ├─ toolchain.md
 │  ├─ data-layer.md
 │  ├─ scheduling.md
-│  └─ ringing.md
+│  ├─ ringing.md
+│  └─ steps.md
 ├─ data\
 │  ├─ build.gradle.kts
 │  ├─ schemas\com.mustwake.alarm.data.db.MustWakeDatabase\{1,2}.json
@@ -143,9 +144,11 @@ E:\MustWake\mustwake\
 │     │  ├─ alarm\ (AlarmRepository, AlarmConstraints, AlarmRepeatDays, NextTriggerCalculator)
 │     │  ├─ db\ (entities, DAOs, MustWakeDatabase + MIGRATION_1_2, enums)
 │     │  ├─ history\ (HistoryRepository, HistoryRetention)
+│     │  ├─ sensor\ (StepBaselineTracker, ShakeCounter)
 │     │  ├─ session\ (SessionRepository)
-│     │  └─ settings\ (AppSettings, SettingsConstraints, SettingsRepository)
-│     └─ test\kotlin\com\mustwake\alarm\data\ (73 tests, Robolectric DAO + migration)
+│     │  ├─ settings\ (AppSettings, SettingsConstraints, SettingsRepository)
+│     │  └─ stop\ (StopPolicy)
+│     └─ test\kotlin\com\mustwake\alarm\data\ (97 tests, Robolectric DAO + migration)
 ├─ shared\
 │  ├─ build.gradle.kts
 │  └─ src\
@@ -162,27 +165,29 @@ E:\MustWake\mustwake\
       │     ├─ alarm\ (AlarmScheduler, AlarmMaintenance)
       │     ├─ notification\ (AlarmNotifications)
       │     ├─ receiver\ (AlarmReceiver, BootReceiver)
+      │     ├─ sensor\ (StepSensorRepository, ShakeDetector)
       │     └─ service\ (AlarmService)
-      └─ test\kotlin\com\mustwake\alarm\ (13 tests: scheduler + notifications)
+      └─ test\kotlin\com\mustwake\alarm\ (18 tests: scheduler + notifications)
 ```
 
 ### 4.2 当前代码
 
 - `App.kt`：Miuix 主题 + 居中文本 “MustWake”。仅骨架。
 - `MainActivity.kt`：`ComponentActivity` + `setContent { App() }`；`singleTop`，showIntent 落到这里（T5 再接闹钟列表）。
-- `RingingActivity`：全屏响铃页（锁屏上方、亮屏），显示时间/标签/目标步数 + 停止按钮；**程序化布局，T5 换 MIUIX**。
+- `RingingActivity`：全屏响铃页（锁屏上方、亮屏），实时步数/剩余步数（降级时显示摇晃次数）、snooze（次数用完禁用）、停止按钮需**长按 10 秒**（短按提示）；程序化布局，T5 换 MIUIX。
+- `AlarmService`：5 秒内前台；health/specialUse 逐级降级；音频/振动/唤醒锁；计步（STEP_COUNTER 基线、STEP_DETECTOR 降级、无传感器转摇晃）；`StopPolicy` 判定 COMPLETED/EMERGENCY/DEGRADED；snooze 持久化 + 独立 requestCode；状态广播。
+- `StepSensorRepository` / `ShakeDetector`：传感器注册与事件转发；纯逻辑 `StepBaselineTracker` / `ShakeCounter` 在 `:data` 并已单测。
 - `AndroidManifest.xml`：launcher + `RingingActivity` + `AlarmService`（`foregroundServiceType="health|specialUse"` + specialUse subtype）+ 两个 receiver + 10 个权限。
 - `MustWakeApp` 持有 `AppContainer`，启动时异步 sweep 过期会话。
-- `AlarmScheduler`：`setAlarmClock`，无精确闹钟权限或 `SecurityException` 时降级 `setAndAllowWhileIdle`；每次注册写 `SCHEDULED` 历史。
-- `AlarmService`：5 秒内前台；运行时选 health/specialUse 并逐个降级重试；MediaPlayer 循环 alarm stream + 振动波形 + 10 分钟 PARTIAL_WAKE_LOCK；启停会话与历史事件；手动停止记 `CANCELLED`。
-- `AlarmNotifications`：`alarm_ringing` 高优先级静音 channel；FSI 仅在 `canUseFullScreenIntent()` 时挂；停止 action + contentIntent。
-- 数据层：Room `mustwake.db` v2（`alarms` / `alarm_events` / `alarm_sessions`），DataStore 设置，四个 Repository，测试在 `data/src/test`（详见 `docs/data-layer.md`）。
+- `AlarmScheduler`：`setAlarmClock`，无精确闹钟权限或 `SecurityException` 时降级 `setAndAllowWhileIdle`；每次注册写 `SCHEDULED` 历史；snooze 用独立 requestCode（`0x40000000`），不会覆盖重复闹钟的下一次。
+- `AlarmNotifications`：`alarm_ringing` 高优先级静音 channel；FSI 仅在 `canUseFullScreenIntent()` 时挂；显示实时步数/摇晃进度，snooze 仅剩次数时显示 action，**没有直接停止 action**。
+- 数据层：Room `mustwake.db` v2（`alarms` / `alarm_events` / `alarm_sessions`），DataStore 设置，四个 Repository，纯逻辑 `StopPolicy` / `StepBaselineTracker` / `ShakeCounter`，测试在 `data/src/test`（详见 `docs/steps.md`）。
 
 ### 4.3 构建产物
 
 - APK：`E:\MustWake\mustwake\androidApp\build\outputs\apk\debug\androidApp-debug.apk`
-- 大小：16,971,605 bytes（T3 后；T2 16,480,973；T1 16,429,715；T0 15,234,367）
-- SHA256：`70ad245cbe3167ecbf530427fbe764680ea0132fe06ce951a31f2ab8e689c574`
+- 大小：16,962,959 bytes（T4 后；T3 16,971,605；T2 16,480,973；T1 16,429,715；T0 15,234,367）
+- SHA256：`5afe4225a2ea018bafdf71feea8e98e77ec55dc6e9077f2503f11b3caea8d944`
 - 包名：`com.mustwake.alarm`
 - minSdk 26 / targetSdk 36 / compileSdk 37
 - 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1–T3 日志未单独落盘）
@@ -352,6 +357,28 @@ cd E:\MustWake\mustwake
 
 ---
 
+## 5C. T4 步数与停止策略（已完成）
+
+**状态：完成。** 细节见 `mustwake/docs/steps.md`。
+
+### 实现结果
+
+- 计步：`TYPE_STEP_COUNTER` 首读为基线（`StepBaselineTracker` 纯逻辑，回滚不为负）；无 COUNTER 时用 `TYPE_STEP_DETECTOR`；两者都注册失败（无硬件 / `ACTIVITY_RECOGNITION` 被拒）→ 进入降级摇晃模式。
+- 摇晃：`ShakeCounter` 阈值 12 m/s²、150ms 防抖、到 `settings.shakeCount`（默认 30）封顶；无加速度计时退回普通紧急停止，避免“永远停不下来”。
+- `StopPolicy`（纯 Kotlin）：步数达标优先判 COMPLETED；其次长按——普通模式 EMERGENCY，降级模式且摇晃达标 DEGRADED，摇晃本身不停止；snooze 上限独立判断。
+- 服务：步数按 `baseSteps + sensorDelta` 累计（snooze 后继续累加）；每步刷新通知并广播；snooze 写 `SNOOZED` 会话（deadline 持久化）+ `scheduleSnooze` 独立 requestCode，停止/完成时 `cancelSnooze`。
+- 通知：显示实时步数或摇晃进度；snooze action 仅在剩余次数时出现；**去掉直接停止 action**，停止必须满足步数或 10 秒长按。
+- 响铃页：实时步数/剩余步数（降级显示摇晃）、snooze 按钮、停止按钮 10 秒长按（短按提示）；启动时 `ACTION_REQUEST_STATE` 拉当前状态，从通知进入不会显示 0 步。
+- 服务动作：`ACTION_START` / `ACTION_SNOOZE` / `ACTION_EMERGENCY` / `ACTION_REQUEST_STATE`；未在响铃时收到后三个动作会立即 `stopSelf`。
+
+### DoD
+
+- [x] `.\gradlew.bat :androidApp:assembleDebug` → BUILD SUCCESSFUL
+- [x] `.\gradlew.bat test` → 115 tests, 0 failures（data 97 + app 18）
+- [x] `StopPolicy`（14）、`StepBaselineTracker`（5）、`ShakeCounter`（5）单测
+- [x] snooze deadline 持久化 + 独立 PendingIntent，进程死亡后由闹钟重响恢复同一会话（代码路径）
+- [ ] 真机走步停止、锁屏/后台计步、摇晃阈值、snooze 重响：**未验证（无设备）**
+
 ---
 
 ## 6. 后续任务（按 plan 执行）
@@ -364,8 +391,8 @@ cd E:\MustWake\mustwake
 | T1 | 数据层 | **已完成**：Room v2 + DataStore + 73 单测 |
 | T2 | 调度与权限 | **已完成**：`setAlarmClock` + 降级、`scheduleSnooze`、Boot/Time 重注册、10 权限 |
 | T3 | 响铃服务 | **已完成**：health/specialUse 运行时选择、FSI + 降级、音频/振动/唤醒锁、session 事件 |
-| T4 | 步数与停止策略 | STEP_COUNTER 基线、STEP_DETECTOR 降级、StopPolicy 单测、snooze deadline 恢复；**当前任务** |
-| T5 | MIUIX 界面骨架 | 列表/编辑/响铃/设置/历史/引导 |
+| T4 | 步数与停止策略 | **已完成**：COUNTER 基线/DETECTOR/摇晃降级、StopPolicy、snooze、10 秒紧急 |
+| T5 | MIUIX 界面骨架 | 列表/编辑/响铃/设置/历史/引导；**当前任务** |
 | T6 | 两个开关 + 液态玻璃 | 独立矩阵、默认关闭、持久化、性能降级 |
 | T7 | 完整版 | 多闹钟、历史、权限引导、HyperOS 引导、摇晃降级、missed sweep |
 | T8 | 真机验收 | spec A–F；FSI/权限撤销、snooze 杀进程、重启、missed |
@@ -381,8 +408,8 @@ cd E:\MustWake\mustwake
 完整验收在 spec 的 A–F。当前状态：
 
 - A 构建安装：构建 PASS；安装未做（无设备）。
-- B 核心闭环：未实现。
-- C snooze/紧急/降级：未实现。
+- B 核心闭环：代码完成（调度→响铃→计步→达标停止），**未真机验证**。
+- C snooze/紧急/降级：代码完成（snooze 3 次 + deadline 持久化、10 秒长按、摇晃 30 次降级），**未真机验证**。
 - D 两个开关：未实现。
 - E 完整版：未实现。
 - F Root 辅助：未实现。
@@ -449,10 +476,10 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 
 ## 10. 快速开始 checklist
 
-- [ ] 读本文 + `mustwake/docs/toolchain.md` + `data-layer.md` + `scheduling.md` + `ringing.md` + spec + plan。
+- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + `mustwake/docs/ringing.md` + `mustwake/docs/steps.md` + spec + plan。
 - [ ] `cd E:\MustWake\mustwake`
 - [ ] `.\gradlew.bat :androidApp:assembleDebug` 确认基线可构建。
-- [ ] 开始 T4：`StepSensorRepository` + `StopPolicy` + snooze + 紧急停止 + 摇晃降级。
+- [ ] 开始 T5：MIUIX 列表/编辑/响铃/设置/历史页 + MiuixNav。
 - [ ] 跑 `.\gradlew.bat test`。
 - [ ] 更新 `HANDOFF.md` 状态、`docs/toolchain.md`（如依赖变化）。
 - [ ] 提交 git（每个任务一个提交）。
@@ -468,6 +495,7 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - 数据层说明：`mustwake/docs/data-layer.md`
 - 调度说明：`mustwake/docs/scheduling.md`
 - 响铃说明：`mustwake/docs/ringing.md`
+- 计步与停止说明：`mustwake/docs/steps.md`
 - 工程 README：`mustwake/README.md`
 - 工具链根说明：`toolchain/README.md`
 - APK：`mustwake/androidApp/build/outputs/apk/debug/androidApp-debug.apk`

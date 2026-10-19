@@ -42,13 +42,17 @@ class AlarmNotificationsTest {
     }
 
     @Test
-    fun `ringing notification is ongoing with a stop action`() {
+    fun `ringing notification is ongoing with a snooze action`() {
         val notification = notifications.buildRinging(
             alarmId = 1L,
             label = "Wake up",
             hour = 7,
             minute = 30,
             goalSteps = 50,
+            steps = 12,
+            snoozeCount = 0,
+            maxSnoozes = 3,
+            snoozeMinutes = 5,
             showFullScreen = true,
         )
 
@@ -57,6 +61,47 @@ class AlarmNotificationsTest {
         assertEquals(1, notification.actions.size)
         assertNotNull(notification.fullScreenIntent)
         assertNotNull(notification.contentIntent)
+
+        val text = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        assertTrue(text.contains("12"))
+        assertTrue(text.contains("50"))
+    }
+
+    @Test
+    fun `no snooze action once the limit is reached`() {
+        val notification = notifications.buildRinging(
+            alarmId = 1L,
+            label = "Wake up",
+            hour = 7,
+            minute = 30,
+            goalSteps = 50,
+            steps = 20,
+            snoozeCount = 3,
+            maxSnoozes = 3,
+            showFullScreen = false,
+        )
+
+        assertEquals(0, notification.actions?.size ?: 0)
+    }
+
+    @Test
+    fun `degraded mode shows shake progress`() {
+        val notification = notifications.buildRinging(
+            alarmId = 1L,
+            label = "Wake up",
+            hour = 7,
+            minute = 30,
+            goalSteps = 50,
+            degradedMode = true,
+            shakeCount = 12,
+            shakeTarget = 30,
+            showFullScreen = false,
+        )
+
+        val text = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        assertTrue(text.contains("12"))
+        assertTrue(text.contains("30"))
+        assertTrue(text.contains("摇晃"))
     }
 
     @Test
@@ -86,7 +131,7 @@ class AlarmNotificationsTest {
             showFullScreen = false,
         )
 
-        val text = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
-        assertTrue(text.contains("闹钟"))
+        val subText = notification.extras.getCharSequence(Notification.EXTRA_SUB_TEXT).toString()
+        assertTrue(subText.contains("闹钟"))
     }
 }

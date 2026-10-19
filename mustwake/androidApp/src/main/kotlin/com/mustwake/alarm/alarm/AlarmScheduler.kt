@@ -70,15 +70,25 @@ class AlarmScheduler(
         require(alarmId > 0L) { "alarmId must be positive, was $alarmId" }
         require(steps >= 0) { "steps must not be negative, was $steps" }
         require(snoozeCount >= 0) { "snoozeCount must not be negative, was $snoozeCount" }
-        return register(alarmId, triggerAt, "snooze#$snoozeCount:${steps}steps")
+        return register(alarmId, triggerAt, "snooze#$snoozeCount:${steps}steps", snooze = true)
     }
 
     /** Reschedules every entry, e.g. after boot or a time zone change. */
     suspend fun rescheduleAll(alarms: List<AlarmEntity>, source: String): List<ScheduleOutcome> =
         alarms.map { schedule(it, source) }
 
+    /** Cancels both the regular registration and any pending snooze for [alarmId]. */
     fun cancel(alarmId: Long) {
-        val pendingIntent = alarmPendingIntent(alarmId)
+        cancelPendingIntent(alarmPendingIntent(alarmId, snooze = false))
+        cancelPendingIntent(alarmPendingIntent(alarmId, snooze = true))
+    }
+
+    /** Cancels only the pending snooze, leaving the repeating series untouched. */
+    fun cancelSnooze(alarmId: Long) {
+        cancelPendingIntent(alarmPendingIntent(alarmId, snooze = true))
+    }
+
+    private fun cancelPendingIntent(pendingIntent: PendingIntent) {
         alarmManager?.cancel(pendingIntent)
         pendingIntent.cancel()
     }
@@ -87,10 +97,11 @@ class AlarmScheduler(
         alarmId: Long,
         triggerAt: Instant,
         reason: String,
+        snooze: Boolean = false,
     ): ScheduleOutcome {
         val manager = alarmManager
             ?: return ScheduleOutcome.Failed(alarmId, "AlarmManager unavailable")
-        val pendingIntent = alarmPendingIntent(alarmId)
+        val pendingIntent = alarmPendingIntent(alarmId, snooze)
         val triggerMillis = triggerAt.toEpochMilli()
 
         val exact = try {
@@ -124,13 +135,13 @@ class AlarmScheduler(
         manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent)
     }
 
-    private fun alarmPendingIntent(alarmId: Long): PendingIntent {
+    private fun alarmPendingIntent(alarmId: Long, snooze: Boolean): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java)
             .setAction(AlarmReceiver.ACTION_ALARM_FIRED)
             .putExtra(AlarmReceiver.EXTRA_ALARM_ID, alarmId)
         return PendingIntent.getBroadcast(
             context,
-            requestCode(alarmId),
+            requestCode(alarmId, snooze),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -143,7 +154,7 @@ class AlarmScheduler(
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         return PendingIntent.getActivity(
             context,
-            requestCode(alarmId),
+            requestCode(alarmId, snooze = false),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -155,7 +166,16 @@ class AlarmScheduler(
         /** Action for the `showIntent` of [AlarmManager.AlarmClockInfo]. */
         const val ACTION_SHOW_RINGING = "com.mustwake.alarm.action.SHOW_RINGING"
 
-        /** Alarm ids are positive row ids; the low 31 bits are a stable, unique request code. */
-        fun requestCode(alarmId: Long): Int = (alarmId and 0x7FFF_FFFFL).toInt()
+        private const val SNOOZE_REQUEST_FLAG = 0x4000_0000L
+
+        /**
+         * Alarm ids are positive row ids; the low 30 bits plus the snooze flag form a stable,
+         * unique request code. Snooze uses a separate code so it never replaces the regular
+         * (repeating) registration.
+         */
+        fun requestCode(alarmId: Long, snooze: Boolean = false): Int {
+            val base = alarmId and 0x3FFF_FFFFL
+            return (base or if (snooze) SNOOZE_REQUEST_FLAG else 0L).toInt()
+        }
     }
 }

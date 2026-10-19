@@ -15,7 +15,8 @@
 - UI 技术选型：**不迁移 Flutter**。`flutter_miuix` 已评估但否决（社区移植、发布不足两月、AGP 9 add-to-app 兼容问题）；理由与退路见 `mustwake/docs/decisions.md`。Miuix import 只允许出现在 `ui/design/MwComponents.kt`。
 - 下一步是 **T8 真机验收**：模拟器预验收已通过（见 `mustwake/docs/testing.md`），仍需小米/红米真机验证计步、音频/振动、HyperOS 后台与权限撤销。
 - 当前没有连接 Android 真机；模拟器 AVD 在 `E:\MustWake\toolchain\android-home\avd\mustwake36`。
-- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/appearance.md` → `mustwake/docs/permissions.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/appearance.md` → `mustwake/docs/permissions.md` → `mustwake/docs/testing.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- **功能扩展阶段**：见 `HANDOFF-PHASE2.md`（试响、跳过下一次、备份、统计、防作弊、小组件、Wear OS 等；除“明确不做”外全部推进，尚未实现）。
 
 ---
 
@@ -637,6 +638,8 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - 界面说明：`mustwake/docs/ui.md`
 - 外观与玻璃：`mustwake/docs/appearance.md`
 - 权限与 missed：`mustwake/docs/permissions.md`
+- 模拟器预验收：`mustwake/docs/testing.md`
+- 功能扩展交接：`HANDOFF-PHASE2.md`
 - 技术选型记录：`mustwake/docs/decisions.md`
 - 工程 README：`mustwake/README.md`
 - 工具链根说明：`toolchain/README.md`

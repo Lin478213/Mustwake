@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "MustWake"
 include(":shared")
+include(":data")
 include(":androidApp")

@@ -41,4 +41,5 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(project(":shared"))
+    implementation(project(":data"))
 }

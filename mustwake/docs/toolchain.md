@@ -20,6 +20,13 @@ Project dependency versions are pinned in `gradle/libs.versions.toml`:
 - Miuix `0.9.4` (`miuix-ui`, `miuix-preference`, `miuix-icons`, `miuix-nav`)
 - Liquid Glass `io.github.kyant0:backdrop:2.0.1`
 
+T1 data layer additions:
+
+- Room `2.8.5` (`room-runtime`, `room-ktx`, `room-compiler` via KSP), applied to the `:data` module
+- DataStore Preferences `1.2.1`
+- KSP plugin `2.3.12` (decoupled versioning; runs against Kotlin 2.4.20 / AGP 9.3.2)
+- Test only: Robolectric `4.16.1`, `androidx.test:core` `1.7.0`, `kotlinx-coroutines-test` `1.11.0`
+
 ## Build result
 
 ```
@@ -35,6 +42,19 @@ APK metadata (`aapt2 dump badging`):
 - minSdk `26`, targetSdk `36`, compileSdk `37`
 
 The shared UI module imports and compiles `MiuixTheme` + `lightColorScheme` + Miuix `Text`, so the Miuix path is proven. Backdrop resolves and is packaged; its first UI usage lands in T6.
+
+## T1 data layer result
+
+```
+BUILD SUCCESSFUL
+:androidApp:assembleDebug + test
+49 JVM tests, 0 failures (including Robolectric DAO tests)
+APK: androidApp\build\outputs\apk\debug\androidApp-debug.apk (16,429,715 bytes)
+```
+
+`:data` uses `com.android.library` + KSP. AGP 9's built-in Kotlin support compiles Kotlin
+without the `org.jetbrains.kotlin.android` plugin, and `ksp(...)` works as usual; no
+`kspAndroidMain` workaround was needed. Details: `docs/data-layer.md`.
 
 ## Self-contained build
 

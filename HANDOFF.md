@@ -1,8 +1,8 @@
 # MustWake 交接文档
 
-> 交接时间：2026-10-19 14:03（UTC+8）
-> 交接状态：**T0 完成，T1 未开始**
-> 工作区：`E:\MustWake`
+> 交接时间：2026-10-19 14:03（UTC+8），T1 完成后更新于 14:25
+> 交接状态：**T1 完成，T2 未开始**
+> 工作区：`E:\MustWake`（已是 git 仓库）
 > 项目：`E:\MustWake\mustwake`
 > 工具链：`E:\MustWake\toolchain`
 
@@ -11,10 +11,10 @@
 ## 1. 一页结论
 
 - 目标：Android 步数闹钟。到点响铃后，必须走到目标步数才能停止；MIUIX 风格；设置里两个独立开关控制悬浮底栏与液态玻璃。
-- 当前只完成了 **T0 工具链 + 空 App**：本地 JDK/Gradle/Android SDK 已装好，KMP + Miuix 工程可编译，APK 已产出。
-- 下一步是 **T1 数据层**：Room（闹钟/历史）+ DataStore（设置）+ 默认值 + 单测。**不要先做 UI 或闹钟服务。**
+- 当前完成了 **T0 工具链 + 空 App** 和 **T1 数据层**：Room（闹钟/历史）+ DataStore（设置）+ Repository + 校验 + 49 个 JVM/DAO 单测，`assembleDebug` 与 `test` 均通过。
+- 下一步是 **T2 调度与权限**：`AlarmScheduler`、`AlarmReceiver`、`BootReceiver`、manifest 权限。**T1 没有做 UI/Service/权限**。
 - 当前没有连接 Android 设备，APK 尚未安装/运行；真机验收是 T8 的事。
-- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
 
 ---
 
@@ -129,7 +129,20 @@ E:\MustWake\mustwake\
 ├─ gradle\
 │  ├─ libs.versions.toml
 │  └─ wrapper\...
-├─ docs\toolchain.md
+├─ docs\
+│  ├─ toolchain.md
+│  └─ data-layer.md
+├─ data\
+│  ├─ build.gradle.kts
+│  ├─ schemas\com.mustwake.alarm.data.db.MustWakeDatabase\1.json
+│  └─ src\
+│     ├─ main\kotlin\com\mustwake\alarm\data\
+│     │  ├─ AppContainer.kt
+│     │  ├─ alarm\ (AlarmRepository, AlarmConstraints, AlarmRepeatDays)
+│     │  ├─ db\ (entities, DAOs, MustWakeDatabase, AlarmEventType)
+│     │  ├─ history\ (HistoryRepository, HistoryRetention)
+│     │  └─ settings\ (AppSettings, SettingsConstraints, SettingsRepository)
+│     └─ test\kotlin\com\mustwake\alarm\data\ (49 tests, Robolectric DAO tests)
 ├─ shared\
 │  ├─ build.gradle.kts
 │  └─ src\
@@ -147,24 +160,40 @@ E:\MustWake\mustwake\
 - `App.kt`：Miuix 主题 + 居中文本 “MustWake”。仅骨架。
 - `MainActivity.kt`：`ComponentActivity` + `setContent { App() }`。
 - `AndroidManifest.xml`：只有 launcher activity；**没有权限、没有 Service、没有 Receiver**。
-- 没有 Application 类、没有 DI、没有 Room/DataStore、没有测试源集。
+- 没有 Application 类、没有 DI 框架；`data/AppContainer` 是手写容器，等 T2 接 Application。
+- 数据层已就绪：Room `mustwake.db` v1（`alarms` / `alarm_events`，schema 已导出）、DataStore 设置、三个 Repository，测试源集在 `data/src/test`（详见 `docs/data-layer.md`）。
 
 ### 4.3 构建产物
 
 - APK：`E:\MustWake\mustwake\androidApp\build\outputs\apk\debug\androidApp-debug.apk`
-- 大小：15,234,367 bytes
-- SHA256：`D2F3388C4B522665C7252909BA288728A949A54C3A8249BA847BD69351A3A541`
+- 大小：16,429,715 bytes（T1 后；T0 时 15,234,367 bytes）
+- SHA256：`1c88ad2e0de7d5032b16e783d08f2f7fc9f1fbe06036bc015a6e0a7964f27abc`
 - 包名：`com.mustwake.alarm`
 - minSdk 26 / targetSdk 36 / compileSdk 37
-- 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`
+- 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1 日志未单独落盘）
 
 ### 4.4 Git
 
-`E:\MustWake` 和 `E:\MustWake\mustwake` **都不是 git 仓库**。不要擅自 `git init` 或提交；如需版本控制先问用户。
+`E:\MustWake` 是 git 仓库（2026-10-19 初始化）。提交策略：**每个功能/任务一个提交**。
+
+- 已跟踪：`HANDOFF.md`、`mustwake/`（含 `data/`、`schemas/`、`docs/`）、`.omc/spec`+`plan`、`.gitignore`。
+- 已忽略：`toolchain/`、`oh-my-claudecode*/`、`**/build/`、`**/.gradle/`、`**/.kotlin/`、`mustwake/local.properties`。
+- 不要提交 `toolchain/` 或上游参考仓库；它们体积大且不是本工程代码。
 
 ---
 
-## 5. 下一任务：T1 数据层（现在从这里开始）
+## 5. T1 数据层（已完成）
+
+**状态：完成。** 实现说明与文件清单见 `mustwake/docs/data-layer.md`，这里只记录结果与偏离。
+
+### 5.0 实现结果
+
+- 新增 Android-only 模块 `:data`（`com.android.library` + KSP），没有把 Room 塞进 KMP `shared`：AGP 9 内置 Kotlin 编译，`ksp(...)` 直接可用，不需要 `kspAndroidMain`。
+- `MustWakeDatabase` v1：`alarms`、`alarm_events`（FK `ON DELETE CASCADE`，索引 `alarm_id`/`timestamp`），schema 导出到 `data/schemas/`。
+- `AlarmEventType` 在交接清单外增加了 `SNOOZED`：T4 需要在进程死亡后恢复 snooze 会话。
+- `SettingsRepository`：写入 `require` 拒绝非法值，读取 `sanitized()` 把越界值回退默认。
+- `AppContainer`：手写懒加载容器，T2 可直接挂到 Application。
+- 版本：Room 2.8.5 / KSP 2.3.12 / DataStore 1.2.1 / Robolectric 4.16.1（仅测试）。
 
 ### 5.1 目标
 
@@ -230,12 +259,22 @@ KSP 在 KMP `shared` 模块里可能需要 `kspAndroidMain` 配置；如果配�
 
 ### 5.4 T1 完成定义（DoD）
 
-- [ ] `.\gradlew.bat :androidApp:assembleDebug` 成功。
-- [ ] `.\gradlew.bat test` 成功（至少 settings 默认值/校验测试）。
-- [ ] Room schema 导出文件存在。
-- [ ] 没有 UI/Service/权限改动（除非编译必需）。
-- [ ] 在 `docs/` 或 `HANDOFF.md` 更新 T1 状态、依赖版本、测试命令。
-- [ ] 报告：改了哪些文件、验证命令与输出、遗留风险。
+- [x] `.\gradlew.bat :androidApp:assembleDebug` 成功（BUILD SUCCESSFUL in 40s，95 tasks）。
+- [x] `.\gradlew.bat test` 成功（49 tests, 0 failures；含 Robolectric DAO 测试）。
+- [x] Room schema 导出文件存在（`data/schemas/com.mustwake.alarm.data.db.MustWakeDatabase/1.json`）。
+- [x] 没有 UI/Service/权限改动；仅 `androidApp` 增加 `implementation(project(":data"))`。
+- [x] T1 状态、依赖版本、测试命令已写入 `docs/data-layer.md`、`docs/toolchain.md`、`README.md`、本文。
+- [x] 报告：见本次汇报（改动文件 / 验证命令 / 风险）。
+
+测试命令：
+
+```powershell
+cd E:\MustWake\mustwake
+.\gradlew.bat test
+.\gradlew.bat :data:testDebugUnitTest
+```
+
+注意：首次跑 Robolectric 需下载 android-all，约 5 分钟；之后走缓存。
 
 ---
 
@@ -246,7 +285,7 @@ KSP 在 KMP `shared` 模块里可能需要 `kspAndroidMain` 配置；如果配�
 | ID | 任务 | 关键点 |
 |---|---|---|
 | T0 | 工具链 + 空 App | **已完成** |
-| T1 | 数据层 | Room + DataStore + 测试；当前任务 |
+| T1 | 数据层 | **已完成**：Room + DataStore + 49 单测 |
 | T2 | 调度与权限 | `setAlarmClock`、`scheduleSnooze`、Boot/Time 重注册、精确闹钟/全屏权限 |
 | T3 | 响铃服务 | health/specialUse 运行时选择、FSI channel + 降级、音频/振动、session 事件 |
 | T4 | 步数与停止策略 | STEP_COUNTER 基线、STEP_DETECTOR 降级、StopPolicy 单测、snooze deadline 恢复 |
@@ -257,7 +296,7 @@ KSP 在 KMP `shared` 模块里可能需要 `kspAndroidMain` 配置；如果配�
 | T9 | Root 辅助（可选） | allowlist 命令、可撤销；**不做 daemon/轮询/root socket** |
 | T10 | 文档与收尾 | README、toolchain、已知限制、状态清理 |
 
-不要跳过 T1 直接做 T3/T5；数据层接口会决定后面所有页面和服务。
+不要跳过 T2 直接做 T3/T5；数据层接口已经定了，接下来 T2 的调度接口（`scheduleSnooze`）是 T3/T4 的前置。
 
 ---
 
@@ -300,9 +339,9 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 
 已知警告（非阻塞）：
 
-- Compose 依赖访问器废弃（`compose.runtime` 等）；T1 可顺手清理，但不要为了警告改版本。
+- Compose 依赖访问器废弃（`compose.runtime` 等）；留给 T5 清理，不要为了警告改版本。
 - Gradle 10 不兼容提示；固定 9.8.1。
-- `commonTest` 未挂到 compilation；T1 处理。
+- `shared` 的 `commonTest` 仍未挂到 compilation；数据层测试放在 `data/src/test`，`shared` 等 T5 有 UI 测试时再处理。
 
 ---
 
@@ -334,12 +373,13 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 
 ## 10. 快速开始 checklist
 
-- [ ] 读本文 + `mustwake/docs/toolchain.md` + spec + plan。
+- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + spec + plan。
 - [ ] `cd E:\MustWake\mustwake`
 - [ ] `.\gradlew.bat :androidApp:assembleDebug` 确认基线可构建。
-- [ ] 开始 T1：Room + DataStore + 默认值 + 单测。
+- [ ] 开始 T2：`AlarmScheduler` + `AlarmReceiver` + `BootReceiver` + manifest 权限。
 - [ ] 跑 `.\gradlew.bat test`。
 - [ ] 更新 `HANDOFF.md` 状态、`docs/toolchain.md`（如依赖变化）。
+- [ ] 提交 git（每个任务一个提交）。
 - [ ] 汇报。
 
 ---
@@ -349,6 +389,7 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - spec：`.omc/specs/deep-interview-step-alarm.md`
 - plan：`.omc/plans/step-alarm.md`
 - 工具链说明：`mustwake/docs/toolchain.md`
+- 数据层说明：`mustwake/docs/data-layer.md`
 - 工程 README：`mustwake/README.md`
 - 工具链根说明：`toolchain/README.md`
 - APK：`mustwake/androidApp/build/outputs/apk/debug/androidApp-debug.apk`

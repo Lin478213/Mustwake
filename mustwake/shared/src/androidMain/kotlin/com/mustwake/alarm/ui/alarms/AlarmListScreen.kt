@@ -43,14 +43,15 @@ fun AlarmListScreen(
     container: AppContainer,
     actions: AlarmUiActions,
     onEdit: (Long) -> Unit,
+    clock: () -> Instant = { Instant.now() },
 ) {
     val alarms by container.alarmRepository.observeAlarms().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
-    var now by remember { mutableStateOf(Instant.now()) }
+    var now by remember { mutableStateOf(clock()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(30_000)
-            now = Instant.now()
+            now = clock()
         }
     }
 

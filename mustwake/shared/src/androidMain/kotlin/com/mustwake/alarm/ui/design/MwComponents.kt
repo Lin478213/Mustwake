@@ -1,5 +1,6 @@
 package com.mustwake.alarm.ui.design
 
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -9,10 +10,12 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -54,6 +57,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -69,6 +73,49 @@ fun MwTheme(content: @Composable () -> Unit) {
     MiuixTheme(
         colors = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
         content = content,
+    )
+}
+
+/**
+ * False in JVM screenshot tests: backdrop's [Highlight.Default] compiles an AGSL shader with a
+ * `layout(color)` uniform, which Robolectric NATIVE graphics cannot parse. When false, [mwGlass]
+ * uses [Highlight.Plain], which paints the same edge stroke without a runtime shader.
+ */
+@VisibleForTesting
+val LocalMwAgslHighlightEnabled = staticCompositionLocalOf { true }
+
+/**
+ * Forces the non-AGSL rendering paths (plain rounded rectangles, plain glass highlight).
+ *
+ * Miuix's squircle is an AGSL [android.graphics.RuntimeShader] that uses the `layout(color)`
+ * uniform qualifier; Robolectric NATIVE graphics cannot compile that shader and throws. The
+ * same applies to backdrop's [Highlight.Default]. Screenshot tests wrap content in this so they
+ * reach the libraries' own non-shader paths instead of crashing. On-device rendering is unchanged.
+ */
+@VisibleForTesting
+@Composable
+fun MwSquircleFallback(content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalSquircleEnabled provides false,
+        LocalMwAgslHighlightEnabled provides false,
+        content = content,
+    )
+}
+
+/**
+ * Fills the viewport with the theme background.
+ *
+ * On device the Activity window is tinted by the system theme; Robolectric's window stays
+ * light, which leaks into screenshot edges. Test hosts wrap content in this (inside [MwTheme])
+ * so light/dark baselines have a consistent canvas. Production screens keep the platform
+ * window background.
+ */
+@VisibleForTesting
+@Composable
+fun MwThemeBackground(content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background),
+        content = { content() },
     )
 }
 
@@ -405,12 +452,19 @@ fun Modifier.mwGlass(backdrop: Backdrop, shape: Shape): Modifier {
         return background(surface.copy(alpha = 0.94f), shape)
     }
     val blurRadius = with(LocalDensity.current) { 24.dp.toPx() }
+    val agslHighlight = LocalMwAgslHighlightEnabled.current
     return this
         .drawBackdrop(
             backdrop = backdrop,
             shape = { shape },
             effects = { blur(blurRadius) },
-            highlight = { Highlight.Default.copy(alpha = 0.75f) },
+            highlight = {
+                if (agslHighlight) {
+                    Highlight.Default.copy(alpha = 0.75f)
+                } else {
+                    Highlight.Plain.copy(alpha = 0.75f)
+                }
+            },
             shadow = null,
         )
         .background(surface.copy(alpha = 0.55f), shape)

@@ -24,10 +24,14 @@ cd E:\MustWake\mustwake
 .\gradlew.bat :androidApp:assembleDebug
 # APK: androidApp\build\outputs\apk\debug\androidApp-debug.apk
 
-# 测试（当前 122 个 JVM/Robolectric 测试）
+# 测试（当前 158 个 JVM/Robolectric 测试）
 .\gradlew.bat test                          # 全部模块
 .\gradlew.bat :data:testDebugUnitTest       # 仅数据层
 .\gradlew.bat :androidApp:testDebugUnitTest # 仅 app 模块
+
+# 截图基线（androidApp/src/test/screenshots/）
+.\gradlew.bat :androidApp:recordRoborazziDebug   # 重新录制基线
+.\gradlew.bat :androidApp:verifyRoborazziDebug   # 对比基线（UI 改动后跑）
 
 # 跑单个测试类
 .\gradlew.bat :data:testDebugUnitTest --tests "*StopPolicyTest*"

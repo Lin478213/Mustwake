@@ -160,7 +160,7 @@ Kotlin support); no `kspAndroidMain` workaround was needed.
 ```powershell
 cd E:\MustWake\mustwake
 .\gradlew.bat :data:testDebugUnitTest     # 119 tests
-.\gradlew.bat test                        # all modules (143 tests)
+.\gradlew.bat test                        # all modules (158 tests; incl. 15 Roborazzi screenshot cases)
 .\gradlew.bat :androidApp:assembleDebug
 ```
 

@@ -1,7 +1,7 @@
 # MustWake 交接文档
 
-> 交接时间：2026-10-19 14:03（UTC+8），T1–T5 完成后更新于 15:08
-> 交接状态：**T5 完成，T6 未开始**
+> 交接时间：2026-10-19 14:03（UTC+8），T1–T6 完成后更新于 15:18
+> 交接状态：**T6 完成，T7 未开始**
 > 工作区：`E:\MustWake`（已是 git 仓库）
 > 项目：`E:\MustWake\mustwake`
 > 工具链：`E:\MustWake\toolchain`
@@ -11,11 +11,11 @@
 ## 1. 一页结论
 
 - 目标：Android 步数闹钟。到点响铃后，必须走到目标步数才能停止；MIUIX 风格；设置里两个独立开关控制悬浮底栏与液态玻璃。
-- 当前完成了 **T0 工具链**、**T1 数据层**、**T2 调度与权限**、**T3 响铃服务**、**T4 步数与停止策略**、**T5 Miuix 界面**：原生 Compose Miuix（列表/编辑/设置/历史/响铃页）+ 设计系统适配层，117 个 JVM/Robolectric 测试全过。
+- 当前完成了 **T0 工具链**、**T1 数据层**、**T2 调度与权限**、**T3 响铃服务**、**T4 步数与停止策略**、**T5 Miuix 界面**、**T6 两个开关与液态玻璃**：原生 Compose Miuix + 设计系统适配层，悬浮底栏/玻璃独立开关（默认关、持久化、低端回退），120 个 JVM/Robolectric 测试全过。
 - UI 技术选型：**不迁移 Flutter**。`flutter_miuix` 已评估但否决（社区移植、发布不足两月、AGP 9 add-to-app 兼容问题）；理由与退路见 `mustwake/docs/decisions.md`。Miuix import 只允许出现在 `ui/design/MwComponents.kt`。
-- 下一步是 **T6 两个开关 + 液态玻璃**：悬浮底栏与液态玻璃的独立视觉实现、默认关闭、性能降级。
+- 下一步是 **T7 完整版**：权限引导、HyperOS 引导、missed sweep 测试、多闹钟/历史完善。
 - 当前没有连接 Android 设备，APK 尚未安装/运行；真机验收是 T8 的事。
-- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/appearance.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
 
 ---
 
@@ -137,6 +137,7 @@ E:\MustWake\mustwake\
 │  ├─ ringing.md
 │  ├─ steps.md
 │  ├─ ui.md
+│  ├─ appearance.md
 │  └─ decisions.md
 ├─ data\
 │  ├─ build.gradle.kts
@@ -172,13 +173,14 @@ E:\MustWake\mustwake\
       │     ├─ receiver\ (AlarmReceiver, BootReceiver)
       │     ├─ sensor\ (StepSensorRepository, ShakeDetector)
       │     └─ service\ (AlarmService)
-      └─ test\kotlin\com\mustwake\alarm\ (20 tests: scheduler, notifications, UI smoke)
+      └─ test\kotlin\com\mustwake\alarm\ (23 tests: scheduler, notifications, UI smoke)
 ```
 
 ### 4.2 当前代码
 
 - `shared/App.kt`：`MwTheme` + 三个 tab（闹钟/历史/设置）+ 编辑路由；页面只依赖 `ui/design` 适配层。
-- `ui/design/MwComponents.kt`：**唯一** import Miuix 的文件（Theme/Scaffold/TopBar/Card/Text/Button/Switch/TextField/NumberPicker/Progress/NavBar）。
+- `ui/design/MwComponents.kt`：**唯一** import Miuix 的文件（Theme/Scaffold/TopBar/Card/Text/Button/Switch/TextField/NumberPicker/Progress/NavBar），同时封装悬浮底栏与 backdrop 玻璃（`mwGlass`）。
+- `App.kt`：读取设置驱动两个开关；内容区 `layerBackdrop` 捕获，底栏作为覆盖层，实现真实模糊；四组合独立。
 - `ui/alarms/AlarmListScreen.kt`：Room 列表、启用开关（保存并重排/取消）、点击编辑、FAB 新建。
 - `ui/alarms/AlarmEditScreen.kt`：时分 NumberPicker、标签、目标步数、重复星期 chips、保存/删除，保存后调用 `AlarmUiActions.schedule`。
 - `ui/settings/SettingsScreen.kt`：两个开关持久化（视觉效果 T6）+ 目标/稍后/次数/摇晃步进器。
@@ -197,7 +199,7 @@ E:\MustWake\mustwake\
 
 - APK：`E:\MustWake\mustwake\androidApp\build\outputs\apk\debug\androidApp-debug.apk`
 - 大小：16,963,136 bytes（T5 后；T4 16,962,959；T3 16,971,605；T2 16,480,973；T1 16,429,715；T0 15,234,367）
-- SHA256：`1be94467791c8e3bdf3f78efa9292d0da88a3ed04133f405fcf20c6c9ca10110`
+- SHA256：`a553e3d620f0818bedce57959ba688acd906ba206adada228ba8c06acec8dcd3`
 - 包名：`com.mustwake.alarm`
 - minSdk 26 / targetSdk 36 / compileSdk 37
 - 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1–T3 日志未单独落盘）
@@ -419,6 +421,32 @@ cd E:\MustWake\mustwake
 
 ---
 
+## 5E. T6 两个开关 + 液态玻璃（已完成）
+
+**状态：完成。** 细节见 `mustwake/docs/appearance.md`。
+
+### 实现结果
+
+- 两个开关独立：`floatingBottomBarEnabled` / `liquidGlassEnabled`，默认 false，DataStore 持久化。
+- 悬浮底栏：用 `FloatingNavigationBarItem` 自绘 28dp 圆角胶囊（Miuix 的 `FloatingNavigationBar` 自绘不透明背景，无法承载玻璃）。
+- 液态玻璃：`rememberLayerBackdrop` 只捕获内容区，底栏作为覆盖层用 `drawBackdrop { blur(24dp) } + Highlight + 55% tint` 绘制，避免自捕获反馈；标准底栏同样支持。
+- 卡片玻璃：72% surface + 0.5dp 白色描边（不 blur，避免卡片捕获自身产生重影）。
+- 降级：`isRenderEffectSupported()` + `isLowRamDevice()` 不满足时退回 94% 不透明；设置页文案说明。
+- 布局：底栏改为内容区覆盖层，列表/历史/设置底部留 120dp，FAB 上移 112dp。
+- 测试：4 种开关组合各一个 Robolectric 冒烟测试。
+
+### DoD
+
+- [x] `.\gradlew.bat :androidApp:assembleDebug` → BUILD SUCCESSFUL
+- [x] `.\gradlew.bat test` → 120 tests, 0 failures（data 97 + app 23）
+- [x] 默认关闭 + 持久化（data 层测试）
+- [x] 4 种组合均可组合、不崩溃（Robolectric）
+- [x] 不支持模糊/低内存回退路径（代码级）
+- [ ] 真机帧率、模糊观感、对比度、触控穿透：**未验证（无设备）**
+- [ ] 对话框玻璃：当前无对话框，随 T7 权限引导一起做
+
+---
+
 ## 6. 后续任务（按 plan 执行）
 
 完整任务图在 `.omc/plans/step-alarm.md`，摘要：
@@ -431,13 +459,13 @@ cd E:\MustWake\mustwake
 | T3 | 响铃服务 | **已完成**：health/specialUse 运行时选择、FSI + 降级、音频/振动/唤醒锁、session 事件 |
 | T4 | 步数与停止策略 | **已完成**：COUNTER 基线/DETECTOR/摇晃降级、StopPolicy、snooze、10 秒紧急 |
 | T5 | MIUIX 界面骨架 | **已完成**：原生 Compose Miuix + 适配层，列表/编辑/设置/历史/响铃 |
-| T6 | 两个开关 + 液态玻璃 | 独立矩阵、默认关闭、持久化、性能降级；**当前任务** |
-| T7 | 完整版 | 多闹钟、历史、权限引导、HyperOS 引导、摇晃降级、missed sweep |
+| T6 | 两个开关 + 液态玻璃 | **已完成**：独立矩阵、默认关、持久化、backdrop 模糊 + 低端回退 |
+| T7 | 完整版 | 多闹钟、历史、权限引导、HyperOS 引导、摇晃降级、missed sweep；**当前任务** |
 | T8 | 真机验收 | spec A–F；FSI/权限撤销、snooze 杀进程、重启、missed |
 | T9 | Root 辅助（可选） | allowlist 命令、可撤销；**不做 daemon/轮询/root socket** |
 | T10 | 文档与收尾 | README、toolchain、已知限制、状态清理 |
 
-不要跳过 T4 直接做 T5；停止策略与步数基线决定响铃页的进度显示和验收 B/C。
+不要跳过 T7 直接做 T8；权限引导与 missed sweep 是验收 E 的前置。
 
 ---
 
@@ -448,7 +476,7 @@ cd E:\MustWake\mustwake
 - A 构建安装：构建 PASS；安装未做（无设备）。
 - B 核心闭环：代码完成（调度→响铃→计步→达标停止），**未真机验证**。
 - C snooze/紧急/降级：代码完成（snooze 3 次 + deadline 持久化、10 秒长按、摇晃 30 次降级），**未真机验证**。
-- D 两个开关：设置项已持久化；悬浮底栏/液态玻璃的视觉效果未实现（T6）。
+- D 两个开关：已实现并持久化；四种组合通过 Robolectric 冒烟，**真机视觉/帧率未验证**。
 - E 完整版：未实现。
 - F Root 辅助：未实现。
 
@@ -514,10 +542,10 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 
 ## 10. 快速开始 checklist
 
-- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + `mustwake/docs/ringing.md` + `mustwake/docs/steps.md` + `mustwake/docs/ui.md` + `mustwake/docs/decisions.md` + spec + plan。
+- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + `mustwake/docs/ringing.md` + `mustwake/docs/steps.md` + `mustwake/docs/ui.md` + `mustwake/docs/appearance.md` + `mustwake/docs/decisions.md` + spec + plan。
 - [ ] `cd E:\MustWake\mustwake`
 - [ ] `.\gradlew.bat :androidApp:assembleDebug` 确认基线可构建。
-- [ ] 开始 T6：悬浮底栏 + 液态玻璃的独立视觉实现与性能降级。
+- [ ] 开始 T7：权限引导页 + HyperOS 引导 + missed sweep 测试 + 历史/多闹钟完善。
 - [ ] 跑 `.\gradlew.bat test`。
 - [ ] 更新 `HANDOFF.md` 状态、`docs/toolchain.md`（如依赖变化）。
 - [ ] 提交 git（每个任务一个提交）。
@@ -535,6 +563,7 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - 响铃说明：`mustwake/docs/ringing.md`
 - 计步与停止说明：`mustwake/docs/steps.md`
 - 界面说明：`mustwake/docs/ui.md`
+- 外观与玻璃：`mustwake/docs/appearance.md`
 - 技术选型记录：`mustwake/docs/decisions.md`
 - 工程 README：`mustwake/README.md`
 - 工具链根说明：`toolchain/README.md`

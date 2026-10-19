@@ -43,25 +43,25 @@ APK metadata (`aapt2 dump badging`):
 
 The shared UI module imports and compiles `MiuixTheme` + `lightColorScheme` + Miuix `Text`, so the Miuix path is proven. Backdrop resolves and is packaged; its first UI usage lands in T6.
 
-## T1–T5 result
+## T1–T6 result
 
 ```
 BUILD SUCCESSFUL
 :androidApp:assembleDebug + test
-117 JVM tests, 0 failures (Room / scheduler / notification / policy / migration / UI smoke)
+120 JVM tests, 0 failures (Room / scheduler / notification / policy / migration / UI smoke)
 APK: androidApp\build\outputs\apk\debug\androidApp-debug.apk (16,963,136 bytes)
 ```
 
-UI is native Compose Miuix 0.9.4 behind `shared/.../ui/design/MwComponents.kt`. Flutter
-(`flutter_miuix`) was evaluated and rejected; rationale in `docs/decisions.md`. No Flutter SDK is
-installed or required.
+UI is native Compose Miuix 0.9.4 behind `shared/.../ui/design/MwComponents.kt`; liquid glass uses
+`io.github.kyant0:backdrop` 2.0.1. Flutter (`flutter_miuix`) was evaluated and rejected; rationale
+in `docs/decisions.md`. No Flutter SDK is installed or required.
 
 `AndroidManifest.xml` declares the alarm permissions (`SCHEDULE_EXACT_ALARM`,
 `USE_FULL_SCREEN_INTENT`, `POST_NOTIFICATIONS`, FGS types, `ACTIVITY_RECOGNITION`, `WAKE_LOCK`,
 `VIBRATE`, `RECEIVE_BOOT_COMPLETED`), registers `MustWakeApp`, `AlarmReceiver`, `BootReceiver`,
 `RingingActivity` and `AlarmService` (`foregroundServiceType="health|specialUse"`).
 Room schema is at version 2. Details: `docs/data-layer.md`, `docs/scheduling.md`,
-`docs/ringing.md`, `docs/steps.md`, `docs/ui.md`.
+`docs/ringing.md`, `docs/steps.md`, `docs/ui.md`, `docs/appearance.md`.
 
 `:data` uses `com.android.library` + KSP. AGP 9's built-in Kotlin support compiles Kotlin
 without the `org.jetbrains.kotlin.android` plugin, and `ksp(...)` works as usual; no

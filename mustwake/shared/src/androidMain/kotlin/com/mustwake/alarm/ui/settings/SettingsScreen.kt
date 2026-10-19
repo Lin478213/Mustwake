@@ -24,18 +24,20 @@ import com.mustwake.alarm.ui.design.MwSectionTitle
 import com.mustwake.alarm.ui.design.MwSwitchRow
 import com.mustwake.alarm.ui.design.MwText
 import com.mustwake.alarm.ui.design.MwTypo
+import com.mustwake.alarm.ui.design.mwGlassSupported
 import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(container: AppContainer) {
     val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
     val scope = rememberCoroutineScope()
+    val glassSupported = mwGlassSupported()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
     ) {
         MwSectionTitle(text = "外观")
         MwCard(modifier = Modifier.fillMaxWidth()) {
@@ -49,7 +51,11 @@ fun SettingsScreen(container: AppContainer) {
             )
             MwSwitchRow(
                 title = "液态玻璃",
-                summary = "半透明模糊表面与高光描边",
+                summary = if (glassSupported) {
+                    "半透明模糊表面与高光描边"
+                } else {
+                    "此设备不支持实时模糊，将使用半透明纯色"
+                },
                 checked = settings.liquidGlassEnabled,
                 onCheckedChange = { enabled ->
                     scope.launch { container.settingsRepository.setLiquidGlassEnabled(enabled) }

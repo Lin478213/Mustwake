@@ -70,7 +70,7 @@ planned with T6 visual work (needs a screenshot library such as Roborazzi).
 
 ## Deferred / known gaps
 
-- 悬浮底栏、液态玻璃的视觉效果：T6（开关已持久化，当前不影响布局）。
+- 悬浮底栏、液态玻璃：已在 T6 实现，见 `docs/appearance.md`。
 - 首次启动权限引导（通知、精确闹钟、全屏通知、ACTIVITY_RECOGNITION）：T7。
 - 编辑页未暴露"启用"开关；新建默认启用，切换在列表页完成。
 - 无 UI 截图基线；Material 风格兜底不存在，Miuix 是唯一实现。

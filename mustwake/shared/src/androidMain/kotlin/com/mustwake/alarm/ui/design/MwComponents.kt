@@ -1,21 +1,42 @@
 package com.mustwake.alarm.ui.design
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import android.app.ActivityManager
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.isRenderEffectSupported
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -117,13 +138,28 @@ fun MwTopBar(
     )
 }
 
+/** Set by [App] from the liquid-glass toggle; cards use it for translucency + edge highlight. */
+val LocalMwGlassEnabled = staticCompositionLocalOf { false }
+
 @Composable
 fun MwCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(modifier = modifier, onClick = onClick, content = content)
+    if (LocalMwGlassEnabled.current) {
+        val shape = RoundedCornerShape(16.dp)
+        Card(
+            modifier = modifier.border(0.5.dp, Color.White.copy(alpha = 0.18f), shape),
+            colors = CardDefaults.defaultColors(
+                color = MiuixTheme.colorScheme.surface.copy(alpha = 0.72f),
+            ),
+            onClick = onClick,
+            content = content,
+        )
+    } else {
+        Card(modifier = modifier, onClick = onClick, content = content)
+    }
 }
 
 @Composable
@@ -270,22 +306,114 @@ fun MwFab(
 
 data class MwTab(val label: String, val icon: ImageVector)
 
+/**
+ * Bottom navigation with two independent style axes:
+ * - [floating]: centered pill instead of a full-width bar;
+ * - [glassBackdrop]: liquid-glass surface (blur + tint + highlight); `null` renders solid.
+ *
+ * The two combinations are independent: floating solid, full-width glass, floating glass, etc.
+ */
 @Composable
 fun MwBottomBar(
     tabs: List<MwTab>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
+    floating: Boolean,
+    glassBackdrop: Backdrop?,
+    modifier: Modifier = Modifier,
 ) {
-    NavigationBar {
-        tabs.forEachIndexed { index, tab ->
-            NavigationBarItem(
-                selected = index == selectedIndex,
-                onClick = { onSelect(index) },
-                icon = tab.icon,
-                label = tab.label,
+    if (floating) {
+        Box(
+            modifier = modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (glassBackdrop != null) {
+                            Modifier.mwGlass(glassBackdrop, RoundedCornerShape(28.dp))
+                        } else {
+                            Modifier.background(
+                                color = MiuixTheme.colorScheme.surfaceContainer,
+                                shape = RoundedCornerShape(28.dp),
+                            )
+                        },
+                    )
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    FloatingNavigationBarItem(
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        icon = tab.icon,
+                        label = tab.label,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        if (glassBackdrop != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .mwGlass(
+                        backdrop = glassBackdrop,
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    ),
             )
         }
+        NavigationBar(
+            color = if (glassBackdrop != null) Color.Transparent else MiuixTheme.colorScheme.surface,
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                NavigationBarItem(
+                    selected = index == selectedIndex,
+                    onClick = { onSelect(index) },
+                    icon = tab.icon,
+                    label = tab.label,
+                )
+            }
+        }
     }
+}
+
+/** True when the platform can render runtime blur and the device is not low-RAM. */
+@Composable
+fun mwGlassSupported(): Boolean {
+    val context = LocalContext.current
+    val lowRam = remember(context) {
+        context.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true
+    }
+    return !lowRam && isRenderEffectSupported()
+}
+
+/**
+ * Liquid-glass background: blurred captured content + translucent tint + lit edge.
+ * Falls back to a near-opaque surface when runtime blur is unavailable.
+ */
+@Composable
+fun Modifier.mwGlass(backdrop: Backdrop, shape: Shape): Modifier {
+    val surface = MiuixTheme.colorScheme.surface
+    if (!mwGlassSupported()) {
+        return background(surface.copy(alpha = 0.94f), shape)
+    }
+    val blurRadius = with(LocalDensity.current) { 24.dp.toPx() }
+    return this
+        .drawBackdrop(
+            backdrop = backdrop,
+            shape = { shape },
+            effects = { blur(blurRadius) },
+            highlight = { Highlight.Default.copy(alpha = 0.75f) },
+            shadow = null,
+        )
+        .background(surface.copy(alpha = 0.55f), shape)
 }
 
 @Composable

@@ -4,16 +4,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.mustwake.alarm.data.AppContainer
+import com.mustwake.alarm.data.settings.AppSettings
 import com.mustwake.alarm.ui.AlarmUiActions
 import com.mustwake.alarm.ui.alarms.AlarmEditScreen
 import com.mustwake.alarm.ui.alarms.AlarmListScreen
 import com.mustwake.alarm.ui.design.MwBottomBar
+import com.mustwake.alarm.ui.design.LocalMwGlassEnabled
 import com.mustwake.alarm.ui.design.MwFab
 import com.mustwake.alarm.ui.design.MwScaffold
 import com.mustwake.alarm.ui.design.MwTab
@@ -41,6 +49,8 @@ internal sealed interface EditorTarget {
 @Composable
 fun App(container: AppContainer, actions: AlarmUiActions) {
     MwTheme {
+        val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
+        val glassBackdrop = rememberLayerBackdrop()
         var tab by remember { mutableStateOf(AppTab.Alarms) }
         var editor by remember { mutableStateOf<EditorTarget?>(null) }
 
@@ -55,39 +65,47 @@ fun App(container: AppContainer, actions: AlarmUiActions) {
             return@MwTheme
         }
 
-        MwScaffold(
-            topBar = { MwTopBar(title = tab.title) },
-            bottomBar = {
-                MwBottomBar(
-                    tabs = listOf(
-                        MwTab(label = "闹钟", icon = MiuixIcons.Alarm),
-                        MwTab(label = "历史", icon = MiuixIcons.ListView),
-                        MwTab(label = "设置", icon = MiuixIcons.Settings),
-                    ),
-                    selectedIndex = tab.ordinal,
-                    onSelect = { tab = AppTab.entries[it] },
-                )
-            },
-            fab = {
-                if (tab == AppTab.Alarms) {
-                    MwFab(
-                        onClick = { editor = EditorTarget.New },
-                        icon = MiuixIcons.Add,
-                        contentDescription = "新建闹钟",
-                    )
-                }
-            },
-        ) { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                when (tab) {
-                    AppTab.Alarms -> AlarmListScreen(
-                        container = container,
-                        actions = actions,
-                        onEdit = { editor = EditorTarget.Existing(it) },
-                    )
+        CompositionLocalProvider(LocalMwGlassEnabled provides settings.liquidGlassEnabled) {
+            MwScaffold(topBar = { MwTopBar(title = tab.title) }) { padding ->
+                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    // Only the screen subtree is captured: the bar can blur what scrolls beneath it
+                    // without capturing itself (which would feed back into the blur).
+                    Box(modifier = Modifier.fillMaxSize().layerBackdrop(glassBackdrop)) {
+                        when (tab) {
+                            AppTab.Alarms -> AlarmListScreen(
+                                container = container,
+                                actions = actions,
+                                onEdit = { editor = EditorTarget.Existing(it) },
+                            )
 
-                    AppTab.History -> HistoryScreen(container = container)
-                    AppTab.Settings -> SettingsScreen(container = container)
+                            AppTab.History -> HistoryScreen(container = container)
+                            AppTab.Settings -> SettingsScreen(container = container)
+                        }
+                    }
+
+                    if (tab == AppTab.Alarms) {
+                        MwFab(
+                            onClick = { editor = EditorTarget.New },
+                            icon = MiuixIcons.Add,
+                            contentDescription = "新建闹钟",
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 24.dp, bottom = 112.dp),
+                        )
+                    }
+
+                    MwBottomBar(
+                        tabs = listOf(
+                            MwTab(label = "闹钟", icon = MiuixIcons.Alarm),
+                            MwTab(label = "历史", icon = MiuixIcons.ListView),
+                            MwTab(label = "设置", icon = MiuixIcons.Settings),
+                        ),
+                        selectedIndex = tab.ordinal,
+                        onSelect = { tab = AppTab.entries[it] },
+                        floating = settings.floatingBottomBarEnabled,
+                        glassBackdrop = if (settings.liquidGlassEnabled) glassBackdrop else null,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
                 }
             }
         }

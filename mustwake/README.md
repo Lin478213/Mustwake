@@ -19,8 +19,10 @@ Android step-gated alarm clock. The alarm rings until the step target is reached
 - **T5 (Miuix UI) — complete**: Compose Miuix shell (alarm list, edit, settings, history, ringing)
   behind a small design-system adapter. See `docs/ui.md`; the Flutter alternative and why it was
   rejected: `docs/decisions.md`.
-- Still missing: the two toggles' visual effects (T6), full-version permission onboarding (T7).
-  Device verification is T8.
+- **T6 (appearance toggles) — complete**: independent floating bottom bar and liquid-glass
+  switches (default off, persisted), backdrop blur with low-RAM/RenderEffect fallback. See
+  `docs/appearance.md`.
+- Still missing: full-version permission onboarding (T7). Device verification is T8.
 
 ## Build
 
@@ -34,7 +36,7 @@ APK: `androidApp\build\outputs\apk\debug\androidApp-debug.apk`
 ## Test
 
 ```powershell
-.\gradlew.bat test                 # all JVM unit tests (117 tests)
+.\gradlew.bat test                 # all JVM unit tests (120 tests)
 .\gradlew.bat :data:testDebugUnitTest
 .\gradlew.bat :androidApp:testDebugUnitTest
 ```

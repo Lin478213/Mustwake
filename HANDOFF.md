@@ -1,7 +1,7 @@
 # MustWake 交接文档
 
-> 交接时间：2026-10-19 14:03（UTC+8），T1 完成后更新于 14:25
-> 交接状态：**T1 完成，T2 未开始**
+> 交接时间：2026-10-19 14:03（UTC+8），T1/T2 完成后更新于 14:40
+> 交接状态：**T2 完成，T3 未开始**
 > 工作区：`E:\MustWake`（已是 git 仓库）
 > 项目：`E:\MustWake\mustwake`
 > 工具链：`E:\MustWake\toolchain`
@@ -11,10 +11,10 @@
 ## 1. 一页结论
 
 - 目标：Android 步数闹钟。到点响铃后，必须走到目标步数才能停止；MIUIX 风格；设置里两个独立开关控制悬浮底栏与液态玻璃。
-- 当前完成了 **T0 工具链 + 空 App** 和 **T1 数据层**：Room（闹钟/历史）+ DataStore（设置）+ Repository + 校验 + 49 个 JVM/DAO 单测，`assembleDebug` 与 `test` 均通过。
-- 下一步是 **T2 调度与权限**：`AlarmScheduler`、`AlarmReceiver`、`BootReceiver`、manifest 权限。**T1 没有做 UI/Service/权限**。
+- 当前完成了 **T0 工具链 + 空 App**、**T1 数据层**、**T2 调度与权限**：Room v2（闹钟/历史/会话）+ DataStore + Repository + `AlarmScheduler`（`setAlarmClock`，无权限时降级）+ Boot/时间变更重注册 + 权限声明，82 个 JVM 测试全过。
+- 下一步是 **T3 响铃前台服务与音频**：`AlarmService`、FSI channel、`RingingActivity`、音频/振动/唤醒锁、session 事件。**目前闹钟触发只会写日志并续约重复闹钟，不会响铃。**
 - 当前没有连接 Android 设备，APK 尚未安装/运行；真机验收是 T8 的事。
-- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
 
 ---
 
@@ -131,18 +131,20 @@ E:\MustWake\mustwake\
 │  └─ wrapper\...
 ├─ docs\
 │  ├─ toolchain.md
-│  └─ data-layer.md
+│  ├─ data-layer.md
+│  └─ scheduling.md
 ├─ data\
 │  ├─ build.gradle.kts
-│  ├─ schemas\com.mustwake.alarm.data.db.MustWakeDatabase\1.json
+│  ├─ schemas\com.mustwake.alarm.data.db.MustWakeDatabase\{1,2}.json
 │  └─ src\
 │     ├─ main\kotlin\com\mustwake\alarm\data\
 │     │  ├─ AppContainer.kt
-│     │  ├─ alarm\ (AlarmRepository, AlarmConstraints, AlarmRepeatDays)
-│     │  ├─ db\ (entities, DAOs, MustWakeDatabase, AlarmEventType)
+│     │  ├─ alarm\ (AlarmRepository, AlarmConstraints, AlarmRepeatDays, NextTriggerCalculator)
+│     │  ├─ db\ (entities, DAOs, MustWakeDatabase + MIGRATION_1_2, enums)
 │     │  ├─ history\ (HistoryRepository, HistoryRetention)
+│     │  ├─ session\ (SessionRepository)
 │     │  └─ settings\ (AppSettings, SettingsConstraints, SettingsRepository)
-│     └─ test\kotlin\com\mustwake\alarm\data\ (49 tests, Robolectric DAO tests)
+│     └─ test\kotlin\com\mustwake\alarm\data\ (73 tests, Robolectric DAO + migration)
 ├─ shared\
 │  ├─ build.gradle.kts
 │  └─ src\
@@ -150,27 +152,33 @@ E:\MustWake\mustwake\
 │     └─ androidMain\AndroidManifest.xml
 └─ androidApp\
    ├─ build.gradle.kts
-   └─ src\main\
-      ├─ AndroidManifest.xml
-      └─ kotlin\com\mustwake\alarm\MainActivity.kt
+   └─ src\
+      ├─ main\
+      │  ├─ AndroidManifest.xml
+      │  └─ kotlin\com\mustwake\alarm\
+      │     ├─ MainActivity.kt, MustWakeApp.kt
+      │     ├─ alarm\ (AlarmScheduler, AlarmMaintenance)
+      │     └─ receiver\ (AlarmReceiver, BootReceiver)
+      └─ test\kotlin\com\mustwake\alarm\alarm\AlarmSchedulerTest.kt (9 tests)
 ```
 
 ### 4.2 当前代码
 
 - `App.kt`：Miuix 主题 + 居中文本 “MustWake”。仅骨架。
-- `MainActivity.kt`：`ComponentActivity` + `setContent { App() }`。
-- `AndroidManifest.xml`：只有 launcher activity；**没有权限、没有 Service、没有 Receiver**。
-- 没有 Application 类、没有 DI 框架；`data/AppContainer` 是手写容器，等 T2 接 Application。
-- 数据层已就绪：Room `mustwake.db` v1（`alarms` / `alarm_events`，schema 已导出）、DataStore 设置、三个 Repository，测试源集在 `data/src/test`（详见 `docs/data-layer.md`）。
+- `MainActivity.kt`：`ComponentActivity` + `setContent { App() }`；`singleTop`，带 `ACTION_SHOW_RINGING` 的 showIntent 会落到这里（T3 改成响铃页入口）。
+- `AndroidManifest.xml`：launcher activity + 10 个权限 + `AlarmReceiver`（exported=false）+ `BootReceiver`（BOOT_COMPLETED/TIME_SET/TIMEZONE_CHANGED/MY_PACKAGE_REPLACED）；`android:name=".MustWakeApp"`。
+- `MustWakeApp` 持有 `AppContainer`，启动时异步 sweep 过期会话。
+- `AlarmScheduler`：`setAlarmClock`，无精确闹钟权限或 `SecurityException` 时降级 `setAndAllowWhileIdle`；每次注册写 `SCHEDULED` 历史。
+- 数据层：Room `mustwake.db` v2（`alarms` / `alarm_events` / `alarm_sessions`），DataStore 设置，四个 Repository，测试在 `data/src/test`（详见 `docs/data-layer.md`）。
 
 ### 4.3 构建产物
 
 - APK：`E:\MustWake\mustwake\androidApp\build\outputs\apk\debug\androidApp-debug.apk`
-- 大小：16,429,715 bytes（T1 后；T0 时 15,234,367 bytes）
-- SHA256：`1c88ad2e0de7d5032b16e783d08f2f7fc9f1fbe06036bc015a6e0a7964f27abc`
+- 大小：16,480,973 bytes（T2 后；T1 16,429,715；T0 15,234,367）
+- SHA256：`4c41ed88820471d979c6d3b762a635c792593a8f3a688d7924e0a643bcbed6c5`
 - 包名：`com.mustwake.alarm`
 - minSdk 26 / targetSdk 36 / compileSdk 37
-- 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1 日志未单独落盘）
+- 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1/T2 日志未单独落盘）
 
 ### 4.4 Git
 
@@ -278,6 +286,38 @@ cd E:\MustWake\mustwake
 
 ---
 
+## 5A. T2 调度与权限（已完成）
+
+**状态：完成。** 细节见 `mustwake/docs/scheduling.md`。
+
+### 实现结果
+
+- `AlarmScheduler`：`setAlarmClock` + `AlarmClockInfo(triggerAt, showIntent)`；无精确闹钟权限或 `SecurityException` 时降级 `setAndAllowWhileIdle` 并在返回值标 `exact=false`；requestCode = `alarmId & 0x7FFFFFFF`，`FLAG_UPDATE_CURRENT or FLAG_IMMUTABLE`。
+- `scheduleSnooze(alarmId, triggerAt, steps, snoozeCount)`：同一 requestCode 覆盖注册，steps/snooze 写进 `SCHEDULED` 历史 reason。
+- `NextTriggerCalculator`（`:data` 纯函数）：一次性闹钟取今天/明天；重复闹钟取下一个匹配星期，严格晚于 now。9 个单测覆盖边界。
+- `AlarmReceiver`：校验 action/alarmId、日志、重复闹钟立即续约下一次；一次性闹钟触发后自动 `setEnabled(false)`，避免重启复活。
+- `BootReceiver`：BOOT_COMPLETED / TIME_SET / TIMEZONE_CHANGED / MY_PACKAGE_REPLACED → sweep 过期会话（写 `MISSED` 历史）+ 重注册所有 enabled 闹钟。
+- `MustWakeApp`：持有 `AppContainer`，启动时异步 sweep，避免历史永远停在“响铃中”。
+- **数据库 v2**：新增 `alarm_sessions`（state/steps/snooze_count/deadline_at），`MIGRATION_1_2` 非破坏性迁移，schema 2 已导出；`SessionRepository` 提供 start/snooze/resume/finish/sweep。
+- manifest：10 个权限 + `AlarmReceiver`(exported=false) + `BootReceiver`(exported=true)，`MainActivity` 改 `singleTop`。
+
+### 与 plan 的偏离（已记录）
+
+- plan 写的是 T2 的 `AlarmReceiver` 直接 `startForegroundService`。本任务只做调度与投递，**不建空壳 Service**：服务、全屏通知、音频在 T3 一起做，T3 在 `AlarmReceiver` 里接这一行。
+- `USE_EXACT_ALARM` 不申请（Play 政策），统一走 `SCHEDULE_EXACT_ALARM` + 降级。
+
+### DoD
+
+- [x] `.\gradlew.bat :androidApp:assembleDebug` → BUILD SUCCESSFUL
+- [x] `.\gradlew.bat test` → 82 tests, 0 failures（data 73 + app 9）
+- [x] 迁移：`data/schemas/.../2.json` 存在，`Migration1To2Test` 通过（真实 SQLite）
+- [x] manifest 合并后 10 个权限、两个 receiver、Application 类均已生效（检查 merged manifest）
+- [ ] `dumpsys alarm` / 2 分钟真机闹钟 / 重启重注册：**未验证（无设备）**
+
+---
+
+---
+
 ## 6. 后续任务（按 plan 执行）
 
 完整任务图在 `.omc/plans/step-alarm.md`，摘要：
@@ -285,9 +325,9 @@ cd E:\MustWake\mustwake
 | ID | 任务 | 关键点 |
 |---|---|---|
 | T0 | 工具链 + 空 App | **已完成** |
-| T1 | 数据层 | **已完成**：Room + DataStore + 49 单测 |
-| T2 | 调度与权限 | `setAlarmClock`、`scheduleSnooze`、Boot/Time 重注册、精确闹钟/全屏权限 |
-| T3 | 响铃服务 | health/specialUse 运行时选择、FSI channel + 降级、音频/振动、session 事件 |
+| T1 | 数据层 | **已完成**：Room v2 + DataStore + 73 单测 |
+| T2 | 调度与权限 | **已完成**：`setAlarmClock` + 降级、`scheduleSnooze`、Boot/Time 重注册、10 权限 |
+| T3 | 响铃服务 | health/specialUse 运行时选择、FSI channel + 降级、音频/振动、session 事件；**当前任务** |
 | T4 | 步数与停止策略 | STEP_COUNTER 基线、STEP_DETECTOR 降级、StopPolicy 单测、snooze deadline 恢复 |
 | T5 | MIUIX 界面骨架 | 列表/编辑/响铃/设置/历史/引导 |
 | T6 | 两个开关 + 液态玻璃 | 独立矩阵、默认关闭、持久化、性能降级 |
@@ -296,7 +336,7 @@ cd E:\MustWake\mustwake
 | T9 | Root 辅助（可选） | allowlist 命令、可撤销；**不做 daemon/轮询/root socket** |
 | T10 | 文档与收尾 | README、toolchain、已知限制、状态清理 |
 
-不要跳过 T2 直接做 T3/T5；数据层接口已经定了，接下来 T2 的调度接口（`scheduleSnooze`）是 T3/T4 的前置。
+不要跳过 T3 直接做 T5；T3 在 `AlarmReceiver` 里接 `startForegroundService`，响铃页 `RingingActivity` 是 T3 的入口，T5 再把它 MIUIX 化。
 
 ---
 
@@ -373,10 +413,10 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 
 ## 10. 快速开始 checklist
 
-- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + spec + plan。
+- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + spec + plan。
 - [ ] `cd E:\MustWake\mustwake`
 - [ ] `.\gradlew.bat :androidApp:assembleDebug` 确认基线可构建。
-- [ ] 开始 T2：`AlarmScheduler` + `AlarmReceiver` + `BootReceiver` + manifest 权限。
+- [ ] 开始 T3：`AlarmService` + FSI channel + `RingingActivity` + 音频/振动/唤醒锁。
 - [ ] 跑 `.\gradlew.bat test`。
 - [ ] 更新 `HANDOFF.md` 状态、`docs/toolchain.md`（如依赖变化）。
 - [ ] 提交 git（每个任务一个提交）。
@@ -390,6 +430,7 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - plan：`.omc/plans/step-alarm.md`
 - 工具链说明：`mustwake/docs/toolchain.md`
 - 数据层说明：`mustwake/docs/data-layer.md`
+- 调度说明：`mustwake/docs/scheduling.md`
 - 工程 README：`mustwake/README.md`
 - 工具链根说明：`toolchain/README.md`
 - APK：`mustwake/androidApp/build/outputs/apk/debug/androidApp-debug.apk`

@@ -23,18 +23,22 @@ data/
    │  ├─ db/     AlarmEntity, AlarmEventEntity, AlarmEventType, AlarmDao,
    │  │          AlarmEventDao, MustWakeDatabase
    │  ├─ history/ HistoryRepository.kt, HistoryRetention.kt
+   │  ├─ session/ SessionRepository.kt
    │  └─ settings/ AppSettings, SettingsConstraints, SettingsRepository
    └─ test/kotlin/com/mustwake/alarm/data/
-      ├─ alarm/AlarmRepositoryTest.kt
+      ├─ alarm/AlarmRepositoryTest.kt, NextTriggerCalculatorTest.kt
       ├─ db/MustWakeDatabaseTest.kt     # Robolectric, real in-memory SQLite
+      ├─ db/Migration1To2Test.kt        # real SQLite migration test
       ├─ db/FakeDaos.kt
       ├─ history/HistoryRepositoryTest.kt
+      ├─ session/SessionRepositoryTest.kt
       └─ settings/SettingsConstraintsTest.kt, SettingsRepositoryTest.kt
 ```
 
 ## Room
 
-Database `mustwake.db`, version 1, `exportSchema = true`, no destructive migration.
+Database `mustwake.db`, version **2** (`MIGRATION_1_2` adds `alarm_sessions`),
+`exportSchema = true`, no destructive migration. Exported schemas: `schemas/.../1.json`, `2.json`.
 
 `alarms`
 
@@ -56,6 +60,13 @@ Database `mustwake.db`, version 1, `exportSchema = true`, no destructive migrati
 `AlarmEventType`: `SCHEDULED`, `RINGING`, `SNOOZED`, `COMPLETED`, `EMERGENCY`, `DEGRADED`,
 `MISSED`, `CANCELLED`. `SNOOZED` is the one addition to the handoff list; T4 needs it to
 reconstruct a snoozed session after process death.
+
+`alarm_sessions` (v2, T2)
+
+`id`, `alarm_id` (FK → `alarms.id`, cascade), `state` (`AlarmSessionState` enum as TEXT),
+`started_at`, `updated_at`, `steps`, `snooze_count`, `deadline_at` (nullable). Indices on
+`alarm_id` and `state`. Active sessions (`RINGING`/`SNOOZED`) with a deadline in the past are
+swept to `MISSED`; see `docs/scheduling.md`.
 
 ## Settings (DataStore)
 
@@ -84,8 +95,9 @@ Validation policy:
   All writes are normalized/validated; unknown ids are rejected.
 - `HistoryRepository` — `record`, `observeRecent`, `observeForAlarm`, `recent`, `forAlarm`,
   `trimToLimit` (newest 200), `purgeExpired` (90 days), `count`.
-- `AppContainer` — lazy singletons for database + three repositories; T2 can hold it from an
-  `Application` subclass.
+- `SessionRepository` — `startSession`, `snooze`, `resume`, `finish`, `sweepExpired`, `activeSession`.
+- `AppContainer` — lazy singletons for database + four repositories; T2 wires it into
+  `MustWakeApp`.
 
 ## Dependencies added
 
@@ -105,21 +117,24 @@ Kotlin support); no `kspAndroidMain` workaround was needed.
 
 ```powershell
 cd E:\MustWake\mustwake
-.\gradlew.bat :data:testDebugUnitTest     # 49 tests
-.\gradlew.bat test                        # all modules
+.\gradlew.bat :data:testDebugUnitTest     # 73 tests
+.\gradlew.bat test                        # all modules (82 tests)
 .\gradlew.bat :androidApp:assembleDebug
 ```
 
-- 49 JVM tests: settings defaults/validation, repository validation and timestamps,
-  history retention/limit, plus real Room CRUD, ordering, cascade delete and event round-trip
-  via Robolectric (SDK 34 runtime).
+- 73 JVM tests in `:data`: settings defaults/validation, repository validation and timestamps,
+  history retention/limit, trigger calculation, session state machine and sweep, plus real Room
+  CRUD, ordering, cascade delete and event round-trip via Robolectric (SDK 34 runtime), and the
+  v1→v2 migration on real SQLite.
+- `:androidApp` adds 9 Robolectric tests for `AlarmScheduler` (registration, replacement, cancel,
+  snooze, history).
 - First Robolectric run downloads `android-all` (~5 min on this network); later runs are fast.
 
 ## Known gaps / follow-ups
 
-- Schema version 1 has no migrations; when T2+ adds columns, add a `Migration` and a
-  `room-testing` migration test (`MigrationTestHelper`).
+- Schema version 2 has one migration (`MIGRATION_1_2`), covered by `Migration1To2Test`. Every
+  further schema change needs a new `Migration`, a new exported schema and a matching test.
 - DAO tests run under Robolectric SDK 34 because Robolectric has no SDK 37 runtime yet.
   Behaviour is SQL-level and version independent; instrumented tests can be added at T8.
-- `room-ktx` currently only supplies coroutine helpers; `HistoryRepository` does not use
-  `withTransaction` yet (no multi-statement writes in T1).
+- `room-ktx` currently only supplies coroutine helpers; multi-statement writes (e.g. finish
+  session + append event) are not wrapped in `withTransaction` yet — T4 should add that.

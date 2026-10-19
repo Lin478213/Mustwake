@@ -43,14 +43,19 @@ APK metadata (`aapt2 dump badging`):
 
 The shared UI module imports and compiles `MiuixTheme` + `lightColorScheme` + Miuix `Text`, so the Miuix path is proven. Backdrop resolves and is packaged; its first UI usage lands in T6.
 
-## T1 data layer result
+## T1/T2 result
 
 ```
 BUILD SUCCESSFUL
 :androidApp:assembleDebug + test
-49 JVM tests, 0 failures (including Robolectric DAO tests)
-APK: androidApp\build\outputs\apk\debug\androidApp-debug.apk (16,429,715 bytes)
+82 JVM tests, 0 failures (Robolectric DAO / scheduler / migration tests included)
+APK: androidApp\build\outputs\apk\debug\androidApp-debug.apk (T2 build)
 ```
+
+`AndroidManifest.xml` now declares the alarm permissions (`SCHEDULE_EXACT_ALARM`,
+`USE_FULL_SCREEN_INTENT`, `POST_NOTIFICATIONS`, FGS types, `ACTIVITY_RECOGNITION`, `WAKE_LOCK`,
+`VIBRATE`, `RECEIVE_BOOT_COMPLETED`) and registers `MustWakeApp`, `AlarmReceiver`, `BootReceiver`.
+Room schema is at version 2. Details: `docs/data-layer.md`, `docs/scheduling.md`.
 
 `:data` uses `com.android.library` + KSP. AGP 9's built-in Kotlin support compiles Kotlin
 without the `org.jetbrains.kotlin.android` plugin, and `ksp(...)` works as usual; no

@@ -25,6 +25,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     packaging {
         resources {
             excludes += arrayOf(
@@ -42,4 +46,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(project(":shared"))
     implementation(project(":data"))
+
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

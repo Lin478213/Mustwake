@@ -96,4 +96,23 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { it[SettingsKeys.ONBOARDING_COMPLETED] = completed }
     }
+
+    /**
+     * Replaces every importable setting in one atomic [DataStore.edit].
+     *
+     * Values are sanitized like the read path, so a hand-edited backup can never store an
+     * out-of-range number. [AppSettings.onboardingCompleted] is per-device and left
+     * untouched: restoring a backup must not skip the permission guide.
+     */
+    suspend fun importSettings(settings: AppSettings) {
+        val sanitized = settings.sanitized()
+        dataStore.edit {
+            it[SettingsKeys.FLOATING_BOTTOM_BAR] = sanitized.floatingBottomBarEnabled
+            it[SettingsKeys.LIQUID_GLASS] = sanitized.liquidGlassEnabled
+            it[SettingsKeys.DEFAULT_GOAL_STEPS] = sanitized.defaultGoalSteps
+            it[SettingsKeys.SNOOZE_MINUTES] = sanitized.snoozeMinutes
+            it[SettingsKeys.MAX_SNOOZES] = sanitized.maxSnoozes
+            it[SettingsKeys.SHAKE_COUNT] = sanitized.shakeCount
+        }
+    }
 }

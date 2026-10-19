@@ -20,6 +20,7 @@ data/
    ├─ main/kotlin/com/mustwake/alarm/data/
    │  ├─ AppContainer.kt                # manual DI container
    │  ├─ alarm/  AlarmRepository.kt, AlarmConstraints.kt, AlarmRepeatDays.kt
+   │  ├─ backup/ BackupModels, BackupCodec, BackupRepository   # M1-A1 JSON backup
    │  ├─ db/     AlarmEntity, AlarmEventEntity, AlarmEventType, AlarmDao,
    │  │          AlarmEventDao, MustWakeDatabase
    │  ├─ history/ HistoryRepository.kt, HistoryRetention.kt
@@ -96,8 +97,47 @@ Validation policy:
 - `HistoryRepository` — `record`, `observeRecent`, `observeForAlarm`, `recent`, `forAlarm`,
   `trimToLimit` (newest 200), `purgeExpired` (90 days), `count`.
 - `SessionRepository` — `startSession`, `snooze`, `resume`, `finish`, `sweepExpired`, `activeSession`.
-- `AppContainer` — lazy singletons for database + four repositories; T2 wires it into
+- `BackupRepository` (M1-A1) — `exportJson`, `importJson(json, MERGE|REPLACE)` returning an
+  `ImportReport` (imported / skippedInvalid / skippedDuplicates + per-item details).
+- `AppContainer` — lazy singletons for database + five repositories; T2 wires it into
   `MustWakeApp`.
+
+## Backup / restore JSON (M1-A1)
+
+`backup/BackupCodec` serialises `BackupData` with kotlinx.serialization (plugin + runtime
+`kotlinx-serialization-json` 1.11.0; the compiler plugin mounts fine on AGP 9's built-in
+Kotlin in `:data`). Document shape (schema version **1**):
+
+```json
+{ "schemaVersion": 1, "exportedAt": 0,
+  "alarms": [{ "id": 1, "hour": 7, "minute": 0, "repeat_days_mask": 127, "label": "",
+               "goal_steps": 50, "enabled": true, "created_at": 0, "updated_at": 0 }],
+  "settings": { "floating_bottom_bar_enabled": false, "liquid_glass_enabled": false,
+                "default_goal_steps": 50, "snooze_minutes": 5, "max_snoozes": 3,
+                "shake_count": 30 } }
+```
+
+- Session/history rows are never exported. `onboarding_completed` is excluded and left
+  untouched on import: the permission guide is per-device and re-runs after a restore.
+- Malformed JSON or an unknown `schemaVersion` (a missing one is rejected too) decode to a
+  failed `Result` / failure `ImportReport`; nothing is thrown and nothing is written. The
+  same holds for a settings write failure after the alarm transaction committed: it is
+  reported in `ImportReport.details` (`alarms imported, settings failed: …`) and the
+  imported alarms stay.
+- Import writes alarms inside a single Room `withTransaction` (via
+  `RoomBackupTransactionRunner`): any failure rolls the whole import back, so REPLACE never
+  ends up with a half-cleared table. Settings go in afterwards as one atomic
+  `SettingsRepository.importSettings` DataStore edit.
+- MERGE dedup key is `(hour, minute, repeatDaysMask, label)`: the existing alarm is kept
+  (goalSteps/enabled untouched) and the backup row counts as `skippedDuplicates`. REPLACE
+  clears the table first and does no dedup.
+- Rows violating `AlarmConstraints` are skipped and counted (including negative
+  `created_at`/`updated_at`); out-of-range settings values fall back to defaults
+  (`AppSettings.sanitized()` semantics). Timestamps and free ids are restored verbatim, so
+  export → wipe → import round-trips exactly. Labels are trimmed for storage and for the
+  dedup key.
+- Uri file IO (SAF create/open) lives in `:shared` `SettingsScreen.kt`, not in `:data`;
+  import files larger than 2 MB are refused.
 
 ## Dependencies added
 
@@ -105,6 +145,8 @@ Validation policy:
 |---|---|
 | androidx.room:room-runtime / room-ktx / room-compiler | 2.8.5 |
 | androidx.datastore:datastore-preferences | 1.2.1 |
+| org.jetbrains.kotlin.plugin.serialization (plugin) | 2.4.20 |
+| org.jetbrains.kotlinx:kotlinx-serialization-json | 1.11.0 |
 | com.google.devtools.ksp (plugin) | 2.3.12 |
 | org.robolectric:robolectric (test only) | 4.16.1 |
 | androidx.test:core (test only) | 1.7.0 |
@@ -117,17 +159,17 @@ Kotlin support); no `kspAndroidMain` workaround was needed.
 
 ```powershell
 cd E:\MustWake\mustwake
-.\gradlew.bat :data:testDebugUnitTest     # 73 tests
-.\gradlew.bat test                        # all modules (82 tests)
+.\gradlew.bat :data:testDebugUnitTest     # 119 tests
+.\gradlew.bat test                        # all modules (143 tests)
 .\gradlew.bat :androidApp:assembleDebug
 ```
 
-- 73 JVM tests in `:data`: settings defaults/validation, repository validation and timestamps,
+- 119 JVM tests in `:data`: settings defaults/validation, repository validation and timestamps,
   history retention/limit, trigger calculation, session state machine and sweep, plus real Room
   CRUD, ordering, cascade delete and event round-trip via Robolectric (SDK 34 runtime), and the
   v1→v2 migration on real SQLite.
-- `:androidApp` adds 9 Robolectric tests for `AlarmScheduler` (registration, replacement, cancel,
-  snooze, history).
+- `:androidApp` adds 24 tests across `AlarmSchedulerTest`, `AlarmNotificationsTest` and
+  `MainActivityTest` (registration, replacement, cancel, snooze, history, notifications).
 - First Robolectric run downloads `android-all` (~5 min on this network); later runs are fast.
 
 ## Known gaps / follow-ups
@@ -138,3 +180,7 @@ cd E:\MustWake\mustwake
   Behaviour is SQL-level and version independent; instrumented tests can be added at T8.
 - `room-ktx` currently only supplies coroutine helpers; multi-statement writes (e.g. finish
   session + append event) are not wrapped in `withTransaction` yet — T4 should add that.
+  (Backup import is the exception: it runs in one `withTransaction`, see above.)
+- M1-A1 adds 21 backup tests (8 codec + 13 repository, incl. wipe→restore round-trip,
+  mid-import rollback and the settings-IO-failure path), bringing `:data` to 119 and the
+  project to 143 JVM tests.

@@ -15,6 +15,11 @@ class FakeAlarmDao : AlarmDao {
 
     val stored: List<AlarmEntity> get() = state.value
 
+    /** Replaces the whole table with [snapshot]; used to emulate transaction rollback. */
+    fun restore(snapshot: List<AlarmEntity>) {
+        state.value = snapshot
+    }
+
     override fun observeAll(): Flow<List<AlarmEntity>> = state.map { it.sortedForList() }
 
     override fun observeEnabled(): Flow<List<AlarmEntity>> =
@@ -30,7 +35,14 @@ class FakeAlarmDao : AlarmDao {
     override suspend fun getEnabled(): List<AlarmEntity> = getAll().filter { it.enabled }
 
     override suspend fun insert(alarm: AlarmEntity): Long {
-        val id = nextId++
+        // Mirrors Room: id == 0 is auto-generated, any other id is stored verbatim, and an
+        // explicit id colliding with an existing row fails (message-aligned with
+        // SQLiteConstraintException; the fake throws IllegalStateException instead).
+        if (alarm.id != 0L && state.value.any { it.id == alarm.id }) {
+            throw IllegalStateException("UNIQUE constraint failed: alarms.id")
+        }
+        val id = if (alarm.id != 0L) alarm.id else nextId++
+        if (id >= nextId) nextId = id + 1
         state.value = state.value + alarm.copy(id = id)
         return id
     }
@@ -47,6 +59,12 @@ class FakeAlarmDao : AlarmDao {
         val before = state.value.size
         state.value = state.value.filterNot { it.id == id }
         return before - state.value.size
+    }
+
+    override suspend fun deleteAll(): Int {
+        val removed = state.value.size
+        state.value = emptyList()
+        return removed
     }
 
     override suspend fun setEnabled(id: Long, enabled: Boolean, updatedAt: Long): Int {

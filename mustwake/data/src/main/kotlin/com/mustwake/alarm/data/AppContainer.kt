@@ -2,6 +2,8 @@ package com.mustwake.alarm.data
 
 import android.content.Context
 import com.mustwake.alarm.data.alarm.AlarmRepository
+import com.mustwake.alarm.data.backup.BackupRepository
+import com.mustwake.alarm.data.backup.RoomBackupTransactionRunner
 import com.mustwake.alarm.data.db.MustWakeDatabase
 import com.mustwake.alarm.data.history.HistoryRepository
 import com.mustwake.alarm.data.session.SessionRepository
@@ -30,5 +32,13 @@ class AppContainer(context: Context) {
 
     val settingsRepository: SettingsRepository by lazy {
         SettingsRepository(appContext.mustWakeSettingsDataStore)
+    }
+
+    val backupRepository: BackupRepository by lazy {
+        BackupRepository(
+            alarmDao = database.alarmDao(),
+            settingsRepository = settingsRepository,
+            transactions = RoomBackupTransactionRunner(database),
+        )
     }
 }

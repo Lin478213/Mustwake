@@ -24,7 +24,7 @@ class SessionRepositoryTest {
         assertEquals(1_000L, session.updatedAt)
         assertEquals(0, session.steps)
         assertEquals(0, session.snoozeCount)
-        assertNull(session.deadlineAt)
+        assertEquals(1_000L + SessionRepository.RINGING_WINDOW_MS, session.deadlineAt)
     }
 
     @Test
@@ -74,7 +74,7 @@ class SessionRepositoryTest {
         val resumed = repository.resume(session.id)
 
         assertEquals(AlarmSessionState.RINGING, resumed.state)
-        assertNull(resumed.deadlineAt)
+        assertEquals(6_000L + SessionRepository.RINGING_WINDOW_MS, resumed.deadlineAt)
     }
 
     @Test
@@ -128,11 +128,17 @@ class SessionRepositoryTest {
     }
 
     @Test
-    fun `ringing session without deadline is not swept`() = runTest {
-        repository.startSession(alarmId = 1L)
-        now = 500_000L
+    fun `ringing session is missed after the ringing window`() = runTest {
+        val session = repository.startSession(alarmId = 1L)
 
+        now = 1_000L + SessionRepository.RINGING_WINDOW_MS - 1
         assertTrue(repository.sweepExpired().isEmpty())
+
+        now = 1_000L + SessionRepository.RINGING_WINDOW_MS + 1
+        val swept = repository.sweepExpired()
+
+        assertEquals(listOf(session.id), swept.map { it.id })
+        assertEquals(AlarmSessionState.MISSED, repository.getSession(session.id)?.state)
     }
 
     @Test

@@ -11,13 +11,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mustwake.alarm.data.AppContainer
+import com.mustwake.alarm.data.alarm.NextTriggerCalculator
+import com.mustwake.alarm.data.db.AlarmEntity
 import com.mustwake.alarm.ui.AlarmUiActions
 import com.mustwake.alarm.ui.design.MwCard
 import com.mustwake.alarm.ui.design.MwSwitch
@@ -25,7 +31,11 @@ import com.mustwake.alarm.ui.design.MwText
 import com.mustwake.alarm.ui.design.MwTypo
 import com.mustwake.alarm.ui.repeatText
 import com.mustwake.alarm.ui.timeText
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -36,6 +46,13 @@ fun AlarmListScreen(
 ) {
     val alarms by container.alarmRepository.observeAlarms().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    var now by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            now = Instant.now()
+        }
+    }
 
     if (alarms.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -65,6 +82,16 @@ fun AlarmListScreen(
                         if (alarm.label.isNotBlank()) {
                             MwText(text = alarm.label, typo = MwTypo.Body)
                         }
+                        if (alarm.enabled) {
+                            nextRingText(alarm, now)?.let { next ->
+                                MwText(
+                                    text = "下次 $next",
+                                    typo = MwTypo.Caption,
+                                    color = MiuixTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                            }
+                        }
                         MwText(
                             text = "${repeatText(alarm.repeatDaysMask)} · ${alarm.goalSteps} 步",
                             typo = MwTypo.Caption,
@@ -89,4 +116,20 @@ fun AlarmListScreen(
             }
         }
     }
+}
+
+private val NEXT_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm")
+private val WEEKDAYS = listOf("一", "二", "三", "四", "五", "六", "日")
+
+private fun nextRingText(alarm: AlarmEntity, now: Instant): String? {
+    val next = NextTriggerCalculator.nextTrigger(alarm, now) ?: return null
+    val zone = ZoneId.systemDefault()
+    val zoned = next.atZone(zone)
+    val today = now.atZone(zone).toLocalDate()
+    val day = when (zoned.toLocalDate()) {
+        today -> "今天"
+        today.plusDays(1) -> "明天"
+        else -> "周${WEEKDAYS[zoned.dayOfWeek.value - 1]}"
+    }
+    return "$day ${zoned.format(NEXT_TIME_FORMAT)}"
 }

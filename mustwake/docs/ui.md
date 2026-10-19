@@ -1,6 +1,6 @@
 # UI layer (T5)
 
-Status: **complete** (2026-10-19). Toggles' visual effects are T6; permission onboarding is T7.
+Status: **complete** through T7 (2026-10-19). Permission onboarding: `permissions.md`.
 
 Technology: native Compose + Miuix 0.9.4, isolated behind a design-system adapter. The Flutter
 alternative was evaluated and rejected — see `decisions.md`.
@@ -40,7 +40,8 @@ Rules:
 
 | screen | behaviour |
 |---|---|
-| 闹钟列表 | Room `observeAlarms`; time/label/repeat/goal; enable switch reschedules or cancels; tap opens editor; FAB creates |
+| 闹钟列表 | Room `observeAlarms`; time/label/repeat/goal; next ring (`今天/明天/周X HH:mm`, refreshed every 30 s); enable switch reschedules or cancels; tap opens editor; FAB creates |
+| 权限引导 | first-run gate + 设置入口；通知/身体活动运行时请求，精确闹钟/FSI/电池/自启动跳系统页；返回时刷新状态（见 `permissions.md`） |
 | 新建/编辑 | hour/minute `NumberPicker`; label `TextField` (≤40); goal 10–500; 7 repeat chips + 每天; save → repository + schedule; delete for existing |
 | 历史 | newest 100 events; alarm label + local time + type + steps + reason; empty state |
 | 设置 | floating bar / liquid glass switches (persisted; visual effect T6); goal/snooze/max-snooze/shake steppers bound to DataStore with validation |
@@ -71,7 +72,7 @@ planned with T6 visual work (needs a screenshot library such as Roborazzi).
 ## Deferred / known gaps
 
 - 悬浮底栏、液态玻璃：已在 T6 实现，见 `docs/appearance.md`。
-- 首次启动权限引导（通知、精确闹钟、全屏通知、ACTIVITY_RECOGNITION）：T7。
+- 首次启动权限引导：已在 T7 实现，见 `docs/permissions.md`。
 - 编辑页未暴露"启用"开关；新建默认启用，切换在列表页完成。
 - 无 UI 截图基线；Material 风格兜底不存在，Miuix 是唯一实现。
 - Robolectric Compose 只验证"能组合"，不验证像素与交互手势。

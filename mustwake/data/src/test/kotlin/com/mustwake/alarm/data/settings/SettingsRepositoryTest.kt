@@ -29,6 +29,16 @@ class SettingsRepositoryTest {
         assertEquals(5, settings.snoozeMinutes)
         assertEquals(3, settings.maxSnoozes)
         assertEquals(30, settings.shakeCount)
+        assertFalse(settings.onboardingCompleted)
+    }
+
+    @Test
+    fun `onboarding completion persists`() = runTest {
+        repository.setOnboardingCompleted(true)
+        assertTrue(repository.currentSettings().onboardingCompleted)
+
+        repository.setOnboardingCompleted(false)
+        assertFalse(repository.currentSettings().onboardingCompleted)
     }
 
     @Test

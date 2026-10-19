@@ -73,8 +73,8 @@ the composition path (including the glass draw) does not crash.
 ## Known gaps
 
 - Real-device blur quality, contrast and frame rate are **unverified** (no device).
-- Dialogs are not implemented yet, so the "glass dialog" part of the spec is deferred until a
-  dialog is introduced (T7 permission sheets).
+- Dialogs are not implemented yet (the permission guide uses cards), so "glass dialog" stays on
+  the polish list until a dialog is actually introduced.
 - Monet dynamic color is still not enabled; theme follows light/dark only.
 - Low-RAM fallback is a capability guess; on-device frame timing may require lowering the 24 dp
   blur radius.

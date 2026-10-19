@@ -13,6 +13,8 @@ data class AppSettings(
     val snoozeMinutes: Int = SettingsConstraints.DEFAULT_SNOOZE_MINUTES,
     val maxSnoozes: Int = SettingsConstraints.DEFAULT_MAX_SNOOZES,
     val shakeCount: Int = SettingsConstraints.DEFAULT_SHAKE_COUNT,
+    /** Whether the first-run permission guide has been shown and dismissed. */
+    val onboardingCompleted: Boolean = false,
 ) {
     /**
      * Returns a copy where every numeric field is guaranteed to be within its valid range.

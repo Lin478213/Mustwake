@@ -21,6 +21,7 @@ internal object SettingsKeys {
     val SNOOZE_MINUTES = intPreferencesKey("snooze_minutes")
     val MAX_SNOOZES = intPreferencesKey("max_snoozes")
     val SHAKE_COUNT = intPreferencesKey("shake_count")
+    val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
 }
 
 /** The single DataStore instance backing [SettingsRepository]. */
@@ -45,6 +46,7 @@ fun Preferences.toAppSettings(): AppSettings = AppSettings(
         ?: SettingsConstraints.DEFAULT_MAX_SNOOZES,
     shakeCount = this[SettingsKeys.SHAKE_COUNT]
         ?: SettingsConstraints.DEFAULT_SHAKE_COUNT,
+    onboardingCompleted = this[SettingsKeys.ONBOARDING_COMPLETED] ?: false,
 ).sanitized()
 
 /**
@@ -89,5 +91,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     suspend fun setShakeCount(count: Int) {
         SettingsConstraints.requireValidShakeCount(count)
         dataStore.edit { it[SettingsKeys.SHAKE_COUNT] = count }
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { it[SettingsKeys.ONBOARDING_COMPLETED] = completed }
     }
 }

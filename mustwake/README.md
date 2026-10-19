@@ -22,7 +22,10 @@ Android step-gated alarm clock. The alarm rings until the step target is reached
 - **T6 (appearance toggles) — complete**: independent floating bottom bar and liquid-glass
   switches (default off, persisted), backdrop blur with low-RAM/RenderEffect fallback. See
   `docs/appearance.md`.
-- Still missing: full-version permission onboarding (T7). Device verification is T8.
+- **T7 (full version) — complete**: first-run permission guide (notifications, exact alarms, FSI,
+  activity recognition, battery, HyperOS autostart), next-ring time in the list, 30 min ringing
+  window so killed sessions become `MISSED`. See `docs/permissions.md`.
+- Still missing: real-device acceptance (T8) and the optional root helper (T9).
 
 ## Build
 
@@ -36,7 +39,7 @@ APK: `androidApp\build\outputs\apk\debug\androidApp-debug.apk`
 ## Test
 
 ```powershell
-.\gradlew.bat test                 # all JVM unit tests (120 tests)
+.\gradlew.bat test                 # all JVM unit tests (122 tests)
 .\gradlew.bat :data:testDebugUnitTest
 .\gradlew.bat :androidApp:testDebugUnitTest
 ```

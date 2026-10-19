@@ -1,7 +1,7 @@
 # MustWake 交接文档
 
-> 交接时间：2026-10-19 14:03（UTC+8），T1–T6 完成后更新于 15:18
-> 交接状态：**T6 完成，T7 未开始**
+> 交接时间：2026-10-19 14:03（UTC+8），T1–T7 完成后更新于 15:52
+> 交接状态：**T7 完成，T8 未开始（无设备）**
 > 工作区：`E:\MustWake`（已是 git 仓库）
 > 项目：`E:\MustWake\mustwake`
 > 工具链：`E:\MustWake\toolchain`
@@ -11,11 +11,11 @@
 ## 1. 一页结论
 
 - 目标：Android 步数闹钟。到点响铃后，必须走到目标步数才能停止；MIUIX 风格；设置里两个独立开关控制悬浮底栏与液态玻璃。
-- 当前完成了 **T0 工具链**、**T1 数据层**、**T2 调度与权限**、**T3 响铃服务**、**T4 步数与停止策略**、**T5 Miuix 界面**、**T6 两个开关与液态玻璃**：原生 Compose Miuix + 设计系统适配层，悬浮底栏/玻璃独立开关（默认关、持久化、低端回退），120 个 JVM/Robolectric 测试全过。
+- 当前完成了 **T0–T7**：工具链、数据层、调度与权限、响铃服务、步数与停止策略、Miuix 界面、两个开关与液态玻璃、完整版（权限引导/HyperOS 引导/下次响铃/30 分钟 missed 窗口），122 个 JVM/Robolectric 测试全过。
 - UI 技术选型：**不迁移 Flutter**。`flutter_miuix` 已评估但否决（社区移植、发布不足两月、AGP 9 add-to-app 兼容问题）；理由与退路见 `mustwake/docs/decisions.md`。Miuix import 只允许出现在 `ui/design/MwComponents.kt`。
-- 下一步是 **T7 完整版**：权限引导、HyperOS 引导、missed sweep 测试、多闹钟/历史完善。
-- 当前没有连接 Android 设备，APK 尚未安装/运行；真机验收是 T8 的事。
-- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/appearance.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
+- 下一步是 **T8 真机验收**：连接小米/红米，按 spec A–F 验证精确闹钟、锁屏 FSI、计步/摇晃、snooze 杀进程、重启、missed。
+- 当前没有连接 Android 设备，APK 尚未安装/运行。
+- 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/appearance.md` → `mustwake/docs/permissions.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
 
 ---
 
@@ -138,6 +138,7 @@ E:\MustWake\mustwake\
 │  ├─ steps.md
 │  ├─ ui.md
 │  ├─ appearance.md
+│  ├─ permissions.md
 │  └─ decisions.md
 ├─ data\
 │  ├─ build.gradle.kts
@@ -173,7 +174,7 @@ E:\MustWake\mustwake\
       │     ├─ receiver\ (AlarmReceiver, BootReceiver)
       │     ├─ sensor\ (StepSensorRepository, ShakeDetector)
       │     └─ service\ (AlarmService)
-      └─ test\kotlin\com\mustwake\alarm\ (23 tests: scheduler, notifications, UI smoke)
+      └─ test\kotlin\com\mustwake\alarm\ (24 tests: scheduler, notifications, UI smoke)
 ```
 
 ### 4.2 当前代码
@@ -187,6 +188,9 @@ E:\MustWake\mustwake\
 - `ui/history/HistoryScreen.kt`：最近 100 条事件，含类型、步数、原因。
 - `ui/ringing/RingingScreen.kt` + `RingingActivity`：全屏 Miuix，步数/摇晃进度、snooze、10 秒长按停止；状态由服务广播驱动。
 - `MainActivity`：构造 `AlarmScheduler` 并注入 `AlarmUiActions(schedule, cancel)`。
+- `ui/permissions/PermissionScreen.kt`：首次启动权限引导 + 设置入口；通知/身体活动运行时请求，精确闹钟/FSI/电池/自启动跳系统页，ON_RESUME 刷新。
+- `ui/alarms/AlarmListScreen.kt`：列表显示“下次 今天/明天/周X HH:mm”，每 30 秒刷新。
+- `SessionRepository`：RINGING 会话带 30 分钟 missed 窗口，进程死亡/force stop 后由 sweep 记 MISSED。
 - `AlarmService`：5 秒内前台；health/specialUse 逐级降级；音频/振动/唤醒锁；计步；`StopPolicy` 判定；snooze 持久化 + 独立 requestCode；状态广播。
 - `StepSensorRepository` / `ShakeDetector`：传感器注册与事件转发；纯逻辑 `StepBaselineTracker` / `ShakeCounter` 在 `:data` 并已单测。
 - `AndroidManifest.xml`：launcher + `RingingActivity` + `AlarmService`（`foregroundServiceType="health|specialUse"` + specialUse subtype）+ 两个 receiver + 10 个权限。
@@ -199,7 +203,7 @@ E:\MustWake\mustwake\
 
 - APK：`E:\MustWake\mustwake\androidApp\build\outputs\apk\debug\androidApp-debug.apk`
 - 大小：16,963,136 bytes（T5 后；T4 16,962,959；T3 16,971,605；T2 16,480,973；T1 16,429,715；T0 15,234,367）
-- SHA256：`a553e3d620f0818bedce57959ba688acd906ba206adada228ba8c06acec8dcd3`
+- SHA256：`453cb7b7571ba51ed48aca4e37039017d350902dadd046f2d14228e74480cbf9`
 - 包名：`com.mustwake.alarm`
 - minSdk 26 / targetSdk 36 / compileSdk 37
 - 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1–T3 日志未单独落盘）
@@ -443,7 +447,34 @@ cd E:\MustWake\mustwake
 - [x] 4 种组合均可组合、不崩溃（Robolectric）
 - [x] 不支持模糊/低内存回退路径（代码级）
 - [ ] 真机帧率、模糊观感、对比度、触控穿透：**未验证（无设备）**
-- [ ] 对话框玻璃：当前无对话框，随 T7 权限引导一起做
+- [ ] 对话框玻璃：当前仍无对话框，保持待办（T10 前若引入对话框再补）
+
+---
+
+## 5F. T7 完整版（已完成）
+
+**状态：完成。** 细节见 `mustwake/docs/permissions.md`。
+
+### 实现结果
+
+- 首次启动引导：新增 `onboardingCompleted`（默认 false）；App 等设置加载完成后决定是否显示 `PermissionScreen`；完成/稍后都写入 true；设置页“权限状态”可重开。
+- 权限页：
+  - 通知、身体活动：运行时请求；另给“设置”快捷入口（应对二次拒绝后不再弹窗）；
+  - 精确闹钟、全屏通知、电池优化：跳对应系统页；
+  - 自启动：MIUI 安全中心 intent，失败回退应用详情；
+  - `ON_RESUME` 自动刷新状态，`startActivity` 全部 `runCatching`。
+- HyperOS：页面明确说明自启动/电池优化无法程序化授予，未提供虚假“已开启”状态。
+- 下次响铃：列表显示“今天/明天/周X HH:mm”，30 秒刷新，使用 `NextTriggerCalculator`。
+- missed：`startSession`/`resume` 给 RINGING 会话设 30 分钟窗口，sweep 现在也覆盖“响铃中”被杀的会话；新增窗口边界测试与 onboarding 持久化测试。
+- 多闹钟/历史/摇晃降级：T2–T4 已具备，本轮补齐列表中的下一次响铃信息。
+
+### DoD
+
+- [x] `.\gradlew.bat :androidApp:assembleDebug` → BUILD SUCCESSFUL
+- [x] `.\gradlew.bat test` → 122 tests, 0 failures（data 98 + app 24）
+- [x] 首次引导/设置入口可组合（Robolectric 首次启动用例）
+- [x] onboarding 持久化、RINGING 窗口 sweep 边界有单测
+- [ ] 权限页各系统跳转、HyperOS 自启动页、拒绝后的真实降级：**未验证（无设备）**
 
 ---
 
@@ -460,12 +491,12 @@ cd E:\MustWake\mustwake
 | T4 | 步数与停止策略 | **已完成**：COUNTER 基线/DETECTOR/摇晃降级、StopPolicy、snooze、10 秒紧急 |
 | T5 | MIUIX 界面骨架 | **已完成**：原生 Compose Miuix + 适配层，列表/编辑/设置/历史/响铃 |
 | T6 | 两个开关 + 液态玻璃 | **已完成**：独立矩阵、默认关、持久化、backdrop 模糊 + 低端回退 |
-| T7 | 完整版 | 多闹钟、历史、权限引导、HyperOS 引导、摇晃降级、missed sweep；**当前任务** |
-| T8 | 真机验收 | spec A–F；FSI/权限撤销、snooze 杀进程、重启、missed |
+| T7 | 完整版 | **已完成**：权限引导、HyperOS 引导、下次响铃、30 分钟 missed 窗口 |
+| T8 | 真机验收 | spec A–F；FSI/权限撤销、snooze 杀进程、重启、missed；**当前任务（需设备）** |
 | T9 | Root 辅助（可选） | allowlist 命令、可撤销；**不做 daemon/轮询/root socket** |
 | T10 | 文档与收尾 | README、toolchain、已知限制、状态清理 |
 
-不要跳过 T7 直接做 T8；权限引导与 missed sweep 是验收 E 的前置。
+T8 需要真机；当前无设备，停在 T8 前，不要伪造验收结果。
 
 ---
 
@@ -477,8 +508,8 @@ cd E:\MustWake\mustwake
 - B 核心闭环：代码完成（调度→响铃→计步→达标停止），**未真机验证**。
 - C snooze/紧急/降级：代码完成（snooze 3 次 + deadline 持久化、10 秒长按、摇晃 30 次降级），**未真机验证**。
 - D 两个开关：已实现并持久化；四种组合通过 Robolectric 冒烟，**真机视觉/帧率未验证**。
-- E 完整版：未实现。
-- F Root 辅助：未实现。
+- E 完整版：代码完成（权限引导、HyperOS 引导、下次响铃、missed 窗口），**未真机验证**。
+- F Root 辅助：未实现（可选）。
 
 设备连接后：
 
@@ -542,10 +573,11 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 
 ## 10. 快速开始 checklist
 
-- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + `mustwake/docs/ringing.md` + `mustwake/docs/steps.md` + `mustwake/docs/ui.md` + `mustwake/docs/appearance.md` + `mustwake/docs/decisions.md` + spec + plan。
+- [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + `mustwake/docs/ringing.md` + `mustwake/docs/steps.md` + `mustwake/docs/ui.md` + `mustwake/docs/appearance.md` + `mustwake/docs/permissions.md` + `mustwake/docs/decisions.md` + spec + plan。
 - [ ] `cd E:\MustWake\mustwake`
 - [ ] `.\gradlew.bat :androidApp:assembleDebug` 确认基线可构建。
-- [ ] 开始 T7：权限引导页 + HyperOS 引导 + missed sweep 测试 + 历史/多闹钟完善。
+- [ ] `adb devices` 确认设备，安装 APK。
+- [ ] 开始 T8：按 spec A–F 逐项验证，记录 PASS/FAIL、截图、logcat、`dumpsys alarm`。
 - [ ] 跑 `.\gradlew.bat test`。
 - [ ] 更新 `HANDOFF.md` 状态、`docs/toolchain.md`（如依赖变化）。
 - [ ] 提交 git（每个任务一个提交）。
@@ -564,6 +596,7 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - 计步与停止说明：`mustwake/docs/steps.md`
 - 界面说明：`mustwake/docs/ui.md`
 - 外观与玻璃：`mustwake/docs/appearance.md`
+- 权限与 missed：`mustwake/docs/permissions.md`
 - 技术选型记录：`mustwake/docs/decisions.md`
 - 工程 README：`mustwake/README.md`
 - 工具链根说明：`toolchain/README.md`

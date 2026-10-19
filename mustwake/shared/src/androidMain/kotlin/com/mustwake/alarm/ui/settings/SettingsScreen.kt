@@ -28,7 +28,7 @@ import com.mustwake.alarm.ui.design.mwGlassSupported
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsScreen(container: AppContainer) {
+fun SettingsScreen(container: AppContainer, onOpenPermissions: () -> Unit = {}) {
     val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
     val scope = rememberCoroutineScope()
     val glassSupported = mwGlassSupported()
@@ -39,7 +39,21 @@ fun SettingsScreen(container: AppContainer) {
             .verticalScroll(rememberScrollState())
             .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
     ) {
-        MwSectionTitle(text = "外观")
+        MwSectionTitle(text = "权限与后台")
+        MwCard(modifier = Modifier.fillMaxWidth(), onClick = onOpenPermissions) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    MwText(text = "权限状态", typo = MwTypo.Body)
+                    MwText(
+                        text = "通知、精确闹钟、全屏通知、自启动",
+                        typo = MwTypo.Caption,
+                    )
+                }
+                MwText(text = "›", typo = MwTypo.Title)
+            }
+        }
+
+        MwSectionTitle(text = "外观", modifier = Modifier.padding(top = 16.dp))
         MwCard(modifier = Modifier.fillMaxWidth()) {
             MwSwitchRow(
                 title = "悬浮底栏",

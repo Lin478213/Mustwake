@@ -71,11 +71,11 @@ Permissions declared in `androidApp/src/main/AndroidManifest.xml`:
 | started_at / updated_at | epoch millis |
 | steps | accumulated across snoozes (never reset) |
 | snooze_count | incremented by `SessionRepository.snooze` |
-| deadline_at | snooze re-ring deadline, `NULL` while ringing |
+| deadline_at | missed window while RINGING (30 min), or snooze re-ring deadline; `NULL` when terminal |
 
 `SessionRepository`: `startSession`, `snooze` (deadline must be in the future, steps are preserved
-as a maximum), `resume` (SNOOZED → RINGING), `finish` (terminal states only), `sweepExpired`
-(deadline passed → MISSED).
+as a maximum), `resume` (SNOOZED → RINGING with a fresh 30 min missed window), `finish` (terminal
+states only), `sweepExpired` (deadline passed → MISSED).
 
 Migration `MIGRATION_1_2` creates the table + indices, `MustWakeDatabase` is version 2 and exports
 `schema/2.json`. No destructive migration.

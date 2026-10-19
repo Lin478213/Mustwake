@@ -9,6 +9,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.mustwake.alarm.data.AppContainer
-import com.mustwake.alarm.data.settings.AppSettings
 import com.mustwake.alarm.ui.AlarmUiActions
 import com.mustwake.alarm.ui.alarms.AlarmEditScreen
 import com.mustwake.alarm.ui.alarms.AlarmListScreen
@@ -28,7 +28,9 @@ import com.mustwake.alarm.ui.design.MwTab
 import com.mustwake.alarm.ui.design.MwTheme
 import com.mustwake.alarm.ui.design.MwTopBar
 import com.mustwake.alarm.ui.history.HistoryScreen
+import com.mustwake.alarm.ui.permissions.PermissionScreen
 import com.mustwake.alarm.ui.settings.SettingsScreen
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Alarm
@@ -49,10 +51,23 @@ internal sealed interface EditorTarget {
 @Composable
 fun App(container: AppContainer, actions: AlarmUiActions) {
     MwTheme {
-        val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
+        val settingsState by container.settingsRepository.settings.collectAsState(initial = null)
+        val settings = settingsState ?: return@MwTheme
         val glassBackdrop = rememberLayerBackdrop()
         var tab by remember { mutableStateOf(AppTab.Alarms) }
         var editor by remember { mutableStateOf<EditorTarget?>(null) }
+        var showPermissions by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+
+        if (!settings.onboardingCompleted || showPermissions) {
+            PermissionScreen(
+                onClose = {
+                    scope.launch { container.settingsRepository.setOnboardingCompleted(true) }
+                    showPermissions = false
+                },
+            )
+            return@MwTheme
+        }
 
         val currentEditor = editor
         if (currentEditor != null) {
@@ -79,7 +94,10 @@ fun App(container: AppContainer, actions: AlarmUiActions) {
                             )
 
                             AppTab.History -> HistoryScreen(container = container)
-                            AppTab.Settings -> SettingsScreen(container = container)
+                            AppTab.Settings -> SettingsScreen(
+                                container = container,
+                                onOpenPermissions = { showPermissions = true },
+                            )
                         }
                     }
 

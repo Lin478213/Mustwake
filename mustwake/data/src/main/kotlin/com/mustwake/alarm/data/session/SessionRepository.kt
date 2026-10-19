@@ -9,9 +9,10 @@ import kotlinx.coroutines.flow.Flow
  * Persistent ringing sessions.
  *
  * State transitions:
- * `startSession` (RINGING) -> `snooze` (SNOOZED, deadline set) -> RINGING again on re-ring,
- * or `finish` (COMPLETED / EMERGENCY / DEGRADED / CANCELLED). `sweepExpired` moves sessions whose
- * deadline passed to MISSED so history never stays stuck on "ringing".
+ * `startSession` (RINGING, 30 minute missed window) -> `snooze` (SNOOZED, deadline set) ->
+ * RINGING again on re-ring, or `finish` (COMPLETED / EMERGENCY / DEGRADED / CANCELLED).
+ * `sweepExpired` moves sessions whose deadline passed to MISSED so history never stays stuck on
+ * "ringing".
  */
 class SessionRepository(
     private val sessionDao: AlarmSessionDao,
@@ -38,6 +39,7 @@ class SessionRepository(
             state = AlarmSessionState.RINGING,
             startedAt = now,
             updatedAt = now,
+            deadlineAt = now + RINGING_WINDOW_MS,
         )
         val id = sessionDao.insert(session)
         return session.copy(id = id)
@@ -71,10 +73,11 @@ class SessionRepository(
         require(session.state == AlarmSessionState.SNOOZED) {
             "session $sessionId is not snoozed, was ${session.state}"
         }
+        val now = clock()
         val updated = session.copy(
             state = AlarmSessionState.RINGING,
-            deadlineAt = null,
-            updatedAt = clock(),
+            deadlineAt = now + RINGING_WINDOW_MS,
+            updatedAt = now,
         )
         sessionDao.update(updated)
         return updated
@@ -117,4 +120,12 @@ class SessionRepository(
 
     private suspend fun requireSession(id: Long): AlarmSessionEntity =
         sessionDao.getById(id) ?: throw IllegalArgumentException("session $id does not exist")
+
+    companion object {
+        /**
+         * A RINGING session that never finishes (process death, force stop) is swept to MISSED
+         * after this window. Snoozed sessions use their own deadline instead.
+         */
+        const val RINGING_WINDOW_MS = 30L * 60L * 1000L
+    }
 }

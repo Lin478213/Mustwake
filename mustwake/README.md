@@ -25,7 +25,9 @@ Android step-gated alarm clock. The alarm rings until the step target is reached
 - **T7 (full version) — complete**: first-run permission guide (notifications, exact alarms, FSI,
   activity recognition, battery, HyperOS autostart), next-ring time in the list, 30 min ringing
   window so killed sessions become `MISSED`. See `docs/permissions.md`.
-- Still missing: real-device acceptance (T8) and the optional root helper (T9).
+- Still missing: real-device acceptance (T8) and the optional root helper (T9). An API 36 emulator
+  pre-check passed 14 scenarios (see `docs/testing.md`); real step counting and HyperOS behaviour
+  still need hardware.
 
 ## Build
 

@@ -95,7 +95,8 @@ Service/audio/vibration/FSI/sensor behaviour on a real device is **not verified*
 
 ## Known gaps
 
-- Ringing screen is not MIUIX and has no progress ring (T5).
-- Audio focus is not requested; DND/alarm-stream behaviour must be recorded on device (T8).
-- `POST_NOTIFICATIONS` / FSI / `ACTIVITY_RECOGNITION` permission onboarding is T5/T7.
+- Audio focus is not requested; DND/alarm-stream behaviour must be recorded on a device (T8).
 - Shake threshold (12 m/s²), debounce (150 ms) and 30-shake target are defaults to tune on hardware.
+- The hold-to-stop button is intentionally retryable after a rejected attempt (policy decides, the
+  button never latches). Verified on the emulator.
+- Emulator coverage and the remaining device-only checks: `testing.md`.

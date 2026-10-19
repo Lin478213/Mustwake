@@ -13,8 +13,8 @@
 - 目标：Android 步数闹钟。到点响铃后，必须走到目标步数才能停止；MIUIX 风格；设置里两个独立开关控制悬浮底栏与液态玻璃。
 - 当前完成了 **T0–T7**：工具链、数据层、调度与权限、响铃服务、步数与停止策略、Miuix 界面、两个开关与液态玻璃、完整版（权限引导/HyperOS 引导/下次响铃/30 分钟 missed 窗口），122 个 JVM/Robolectric 测试全过。
 - UI 技术选型：**不迁移 Flutter**。`flutter_miuix` 已评估但否决（社区移植、发布不足两月、AGP 9 add-to-app 兼容问题）；理由与退路见 `mustwake/docs/decisions.md`。Miuix import 只允许出现在 `ui/design/MwComponents.kt`。
-- 下一步是 **T8 真机验收**：连接小米/红米，按 spec A–F 验证精确闹钟、锁屏 FSI、计步/摇晃、snooze 杀进程、重启、missed。
-- 当前没有连接 Android 设备，APK 尚未安装/运行。
+- 下一步是 **T8 真机验收**：模拟器预验收已通过（见 `mustwake/docs/testing.md`），仍需小米/红米真机验证计步、音频/振动、HyperOS 后台与权限撤销。
+- 当前没有连接 Android 真机；模拟器 AVD 在 `E:\MustWake\toolchain\android-home\avd\mustwake36`。
 - 必读顺序：本文 → `mustwake/docs/toolchain.md` → `mustwake/docs/data-layer.md` → `mustwake/docs/scheduling.md` → `mustwake/docs/ringing.md` → `mustwake/docs/steps.md` → `mustwake/docs/ui.md` → `mustwake/docs/appearance.md` → `mustwake/docs/permissions.md` → `mustwake/docs/decisions.md` → `.omc/specs/deep-interview-step-alarm.md` → `.omc/plans/step-alarm.md` → `mustwake/README.md`。
 
 ---
@@ -139,6 +139,7 @@ E:\MustWake\mustwake\
 │  ├─ ui.md
 │  ├─ appearance.md
 │  ├─ permissions.md
+│  ├─ testing.md
 │  └─ decisions.md
 ├─ data\
 │  ├─ build.gradle.kts
@@ -203,7 +204,7 @@ E:\MustWake\mustwake\
 
 - APK：`E:\MustWake\mustwake\androidApp\build\outputs\apk\debug\androidApp-debug.apk`
 - 大小：16,963,136 bytes（T5 后；T4 16,962,959；T3 16,971,605；T2 16,480,973；T1 16,429,715；T0 15,234,367）
-- SHA256：`453cb7b7571ba51ed48aca4e37039017d350902dadd046f2d14228e74480cbf9`
+- SHA256：`a678277167d5ed29fb148680599e469439eabf4ded65a2f3b09f90a1cd6ac078`
 - 包名：`com.mustwake.alarm`
 - minSdk 26 / targetSdk 36 / compileSdk 37
 - 构建日志：`build-selfcontained-log.txt`、`build-miuix-log.txt`（T0 产物，T1–T3 日志未单独落盘）
@@ -478,6 +479,44 @@ cd E:\MustWake\mustwake
 
 ---
 
+## 5G. T8 模拟器预验收（进行中）
+
+**状态：模拟器 14 项通过，真机未做。** 详见 `mustwake/docs/testing.md`。
+
+### 环境
+
+- emulator 37.2.12 + `system-images;android-36;google_apis;x86_64`，WHPX 加速。
+- SDK、AVD、`ANDROID_USER_HOME` 全部在 E 盘：`toolchain\android-sdk`、`toolchain\android-home`。
+- `sdkmanager` 下载卡在 0.5MB/s，改用 curl 直连（60+MB/s）解压；`avdmanager` 缺 package.xml，AVD 手工创建。
+
+### 通过的场景
+
+1. 首次安装 → 权限引导页；完成 → 空列表。
+2. UI 创建 07:00 每天 50 步闹钟；列表显示“下次 明天 07:00”。
+3. `dumpsys alarm`：精确闹钟（exactAllowReason=permission），showIntent 指向 RingingActivity。
+4. 锁屏 → FSI 拉起全屏页（07:00、摇晃 0/30）。
+5. 无计步传感器 → 摇晃降级；注入加速度到 30/30。
+6. 0 摇晃长按 10 秒 → 被策略拒绝，服务继续（日志 `emergency ignored`）。
+7. 30 摇 + 长按 → `DEGRADED` 结束，服务停止。
+8. snooze 1 分钟 → 会话 SNOOZED + deadline；snooze 闹钟与次日 07:00 日闹钟同时存在。
+9. snooze 到点重响 → 同一会话回到 RINGING，`snooze=1/3`；通知可点开全屏页。
+10. 两个开关四种组合逐一截图验证。
+11. 重启 → 解锁后 BOOT_COMPLETED 重注册 1/1 闹钟。
+12. 插入过期会话 → app-start sweep 标 MISSED 并写历史（`session expired (app-start)`）。
+
+### 本轮修掉的 bug
+
+长按停止按钮在“被策略拒绝一次”后会永久禁用（本地 `fired` 状态未复位），导致之后摇够 30 次也无法停止。已移除该状态，按钮保持可重试，由服务端 `StopPolicy` 决定；模拟器复测通过。
+
+### 仍需真机
+
+- 真实 `TYPE_STEP_COUNTER`、锁屏/后台计步、步数进度。
+- 音频/振动/DND（模拟器 `-no-audio`）。
+- 权限撤销（FSI/精确闹钟/ACTIVITY_RECOGNITION）、HyperOS 自启动/电池限制、force-stop 行为。
+- 计步阈值与摇晃灵敏度调参。
+
+---
+
 ## 6. 后续任务（按 plan 执行）
 
 完整任务图在 `.omc/plans/step-alarm.md`，摘要：
@@ -492,7 +531,7 @@ cd E:\MustWake\mustwake
 | T5 | MIUIX 界面骨架 | **已完成**：原生 Compose Miuix + 适配层，列表/编辑/设置/历史/响铃 |
 | T6 | 两个开关 + 液态玻璃 | **已完成**：独立矩阵、默认关、持久化、backdrop 模糊 + 低端回退 |
 | T7 | 完整版 | **已完成**：权限引导、HyperOS 引导、下次响铃、30 分钟 missed 窗口 |
-| T8 | 真机验收 | spec A–F；FSI/权限撤销、snooze 杀进程、重启、missed；**当前任务（需设备）** |
+| T8 | 真机验收 | 模拟器预验收通过（14 项）；计步/音频/权限撤销待真机；**当前任务** |
 | T9 | Root 辅助（可选） | allowlist 命令、可撤销；**不做 daemon/轮询/root socket** |
 | T10 | 文档与收尾 | README、toolchain、已知限制、状态清理 |
 
@@ -504,11 +543,11 @@ T8 需要真机；当前无设备，停在 T8 前，不要伪造验收结果。
 
 完整验收在 spec 的 A–F。当前状态：
 
-- A 构建安装：构建 PASS；安装未做（无设备）。
-- B 核心闭环：代码完成（调度→响铃→计步→达标停止），**未真机验证**。
-- C snooze/紧急/降级：代码完成（snooze 3 次 + deadline 持久化、10 秒长按、摇晃 30 次降级），**未真机验证**。
-- D 两个开关：已实现并持久化；四种组合通过 Robolectric 冒烟，**真机视觉/帧率未验证**。
-- E 完整版：代码完成（权限引导、HyperOS 引导、下次响铃、missed 窗口），**未真机验证**。
+- A 构建安装：构建 PASS；模拟器安装/启动 PASS；真机未做。
+- B 核心闭环：模拟器验证了调度→锁屏响铃→摇晃降级停止；**真实计步未验证**。
+- C snooze/紧急/降级：模拟器 PASS（snooze 1 分钟 + 独立重响、0 摇晃长按被拒、30 摇+长按 DEGRADED）；真机未验证。
+- D 两个开关：四种组合在模拟器逐一截图验证；真机视觉/帧率未验证。
+- E 完整版：权限引导、重启重注册、app-start missed sweep 在模拟器 PASS；HyperOS 自启动/电池未验证。
 - F Root 辅助：未实现（可选）。
 
 设备连接后：
@@ -576,7 +615,8 @@ HyperOS 上需要重点测：锁屏、深度休眠、重启、精确闹钟权限
 - [ ] 读本文 + `mustwake/docs/toolchain.md` + `mustwake/docs/data-layer.md` + `mustwake/docs/scheduling.md` + `mustwake/docs/ringing.md` + `mustwake/docs/steps.md` + `mustwake/docs/ui.md` + `mustwake/docs/appearance.md` + `mustwake/docs/permissions.md` + `mustwake/docs/decisions.md` + spec + plan。
 - [ ] `cd E:\MustWake\mustwake`
 - [ ] `.\gradlew.bat :androidApp:assembleDebug` 确认基线可构建。
-- [ ] `adb devices` 确认设备，安装 APK。
+- [x] 模拟器：AVD 在 `E:\MustWake\toolchain\android-home\avd\mustwake36`，安装并跑通 14 项预验收。
+- [ ] 真机：`adb devices` 确认小米/红米，按 spec A–F 补计步/音频/权限撤销/HyperOS。
 - [ ] 开始 T8：按 spec A–F 逐项验证，记录 PASS/FAIL、截图、logcat、`dumpsys alarm`。
 - [ ] 跑 `.\gradlew.bat test`。
 - [ ] 更新 `HANDOFF.md` 状态、`docs/toolchain.md`（如依赖变化）。

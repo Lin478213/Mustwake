@@ -171,20 +171,17 @@ private fun MwHoldToStopButton(
     val scope = rememberCoroutineScope()
     val colors = MiuixTheme.colorScheme
     var holding by remember { mutableStateOf(false) }
-    var fired by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(if (fired) colors.disabledPrimaryButton else colors.error)
-            .pointerInput(fired) {
-                if (fired) return@pointerInput
+            .background(colors.error)
+            .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
                         holding = true
                         val job = scope.launch {
                             delay(holdMillis)
-                            fired = true
                             holding = false
                             onHold()
                         }

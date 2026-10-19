@@ -63,6 +63,10 @@ in `docs/decisions.md`. No Flutter SDK is installed or required.
 Room schema is at version 2. Details: `docs/data-layer.md`, `docs/scheduling.md`,
 `docs/ringing.md`, `docs/steps.md`, `docs/ui.md`, `docs/appearance.md`, `docs/permissions.md`.
 
+Emulator (all files on E:) is installed under
+`toolchain/android-home/avd/mustwake36`; setup and the T8 pre-check results are in
+`docs/testing.md`.
+
 `:data` uses `com.android.library` + KSP. AGP 9's built-in Kotlin support compiles Kotlin
 without the `org.jetbrains.kotlin.android` plugin, and `ksp(...)` works as usual; no
 `kspAndroidMain` workaround was needed. Details: `docs/data-layer.md`.

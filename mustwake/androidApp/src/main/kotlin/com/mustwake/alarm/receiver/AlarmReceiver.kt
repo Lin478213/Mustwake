@@ -7,6 +7,7 @@ import android.util.Log
 import com.mustwake.alarm.MustWakeApp
 import com.mustwake.alarm.alarm.AlarmScheduler
 import com.mustwake.alarm.data.alarm.AlarmRepeatDays
+import com.mustwake.alarm.service.AlarmService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,9 +16,9 @@ import kotlinx.coroutines.launch
 /**
  * Receives the broadcast registered by [AlarmScheduler].
  *
- * T2 guarantees delivery and keeps repeating alarms chained (the next occurrence is registered
- * right away, so a missed ringing window cannot stop the series). Starting the ringing foreground
- * service and the full-screen notification is T3's job and plugs in here.
+ * Starts [AlarmService] immediately (foreground within 5 s is the service's responsibility),
+ * then keeps repeating alarms chained by registering the next occurrence. One-shot alarms are
+ * disabled after firing so a reboot cannot resurrect them.
  */
 class AlarmReceiver : BroadcastReceiver() {
 
@@ -33,6 +34,12 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         Log.i(TAG, "alarm $alarmId fired")
+        try {
+            AlarmService.start(context, alarmId)
+        } catch (throwable: Throwable) {
+            Log.e(TAG, "failed to start ringing service for $alarmId", throwable)
+        }
+
         val app = context.applicationContext as? MustWakeApp ?: run {
             Log.e(TAG, "application is not MustWakeApp, cannot reschedule alarm $alarmId")
             return

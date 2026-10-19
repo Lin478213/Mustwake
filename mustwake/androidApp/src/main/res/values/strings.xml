@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="alarm_channel_ringing_name">闹钟响铃</string>
+    <string name="alarm_channel_ringing_description">闹钟到点后的响铃通知</string>
+    <string name="alarm_notification_title">闹钟响铃中</string>
+    <string name="alarm_notification_text">%1$s · 点按停止</string>
+    <string name="alarm_notification_stop">停止</string>
+    <string name="ringing_default_label">闹钟</string>
+    <string name="ringing_title">闹钟响铃中</string>
+    <string name="ringing_goal">目标 %1$d 步</string>
+    <string name="ringing_hint">请起身走动，达到目标步数后停止</string>
+    <string name="ringing_stop">停止响铃</string>
+</resources>

@@ -10,8 +10,11 @@ Android step-gated alarm clock. The alarm rings until the step target is reached
 - **T2 (scheduling + permissions) — complete**: `AlarmScheduler` (`setAlarmClock` with inexact
   fallback), boot/time-zone reschedule, session table v2 + missed sweep, manifest permissions.
   See `docs/scheduling.md`.
-- Still missing: ringing foreground service, full-screen ringing UI, step tracking, MIUIX screens.
-  A fired alarm currently only logs and keeps repeating alarms chained (T3).
+- **T3 (ringing service) — complete**: foreground service with runtime `health`/`specialUse` type,
+  looping alarm audio + vibration + wake lock, silent high-importance channel with full-screen
+  intent fallback, full-screen `RingingActivity`. See `docs/ringing.md`.
+- Still missing: step tracking / step-gated stop (T4), MIUIX screens (T5), the two toggles and
+  liquid glass (T6). A fired alarm currently rings until the user stops it manually.
 
 ## Build
 
@@ -25,7 +28,7 @@ APK: `androidApp\build\outputs\apk\debug\androidApp-debug.apk`
 ## Test
 
 ```powershell
-.\gradlew.bat test                 # all JVM unit tests (82 tests)
+.\gradlew.bat test                 # all JVM unit tests (86 tests)
 .\gradlew.bat :data:testDebugUnitTest
 .\gradlew.bat :androidApp:testDebugUnitTest
 ```

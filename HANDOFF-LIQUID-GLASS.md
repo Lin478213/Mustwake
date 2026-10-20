@@ -23,8 +23,18 @@
 | JVM 回归（**156 例 0 失败**，JUnit XML 计数） | ✅ |
 | 截图基线 **14 张全部录制**（含 shell_liquid_light 液态壳、settings_liquid_light 控件态） | ✅ |
 | `verifyRoborazziDebug` 连续两次全绿（其一 `--rerun-tasks` 强制实跑） | ✅ |
-| 模拟器人工核对（拖动拇指/按压/色差/对话框） | ⬜ 未做（模拟器窗口曾开过，app 装的是旧 UI） |
-| git 提交 | ⬜ 未提交（全部在工作区） |
+| 模拟器人工核对 | 🔄 部分完成：tab 点击/拖拽拇指切换 ✅（BUG-1 修复后实测）、液态开关/滑块/±按钮渲染 ✅；对话框、按压放大、色差细节待细查 |
+| git 提交 | ✅ 已全部本地提交（见下方提交清单） |
+
+## 提交清单（均在本地，**未推送**）
+
+| 提交 | 内容 |
+|---|---|
+| `93f3b6a` | `feat(ui): rework liquid glass as 1:1 AndroidLiquidGlass port`（主实现，42 文件） |
+| `2d80a4d` | `fix(ui): bottom tab thumb frozen on selection change (BUG-1)` |
+| （更早）`6eeba11` / `812323c` / `8f42674` | M1-A3 spike / EOL chore / M1-A3 真实场景 |
+
+推送：`git push` 本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推（一次推全部 5 个）。
 
 ## 一比一参数与移植映射（实现已落）
 
@@ -59,8 +69,8 @@ JVM/截图测试编译不了 AGSL 的 `layout(color)` 与 `shader` 类型 unifor
 2. **`dialog_liquid_light` 截图用例**（玻璃对话框基线）——已留 TODO 在 `ScreenshotTests.kt`。两条路任选：
    a) `androidApp/build.gradle.kts` 加 `testImplementation(libs.backdrop)`（或 `libs.kyant.shapes` + compose foundation）后直接截 `LiquidDialog`；
    b) 经 App 壳 compose，点「替换导入」触发 `MwDialogHost` 再截图（不需额外依赖）。
-3. **模拟器人工核对**（计划验证 §1-3）：装 debug 包 → 开液态玻璃 → 核对底栏胶囊/36dp/12sp、**拖拇指切 tab、按压缩放 78/56、色差折射、跟手高光**、LiquidToggle/LiquidSlider/按钮、玻璃对话框；关开关回退无残留。与参考 demo 对照可装仓库内 `AndroidLiquidGlass/androidApp` 的 catalog（可选）。
-4. **推送**：`git push` 在本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推；连同 M1-A3 的三个未推提交（`6eeba11`/`812323c`/`8f42674`）一起推。
+3. **模拟器人工核对（剩余项）**：tab 点击/拖拽与液态开关/滑块/±按钮已实测 ✅；还差——玻璃对话框（设置页点「替换导入」）、按压放大 78/56、色差折射与跟手高光的细部观感、关开关回退无残留、与参考 demo 对照（可选，仓库内 `AndroidLiquidGlass/androidApp` catalog 可装）。
+4. **推送**：`git push` 在本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推，一次推全部 5 个本地提交（见提交清单）。
 5. 小项：`MwSlider` 非玻璃态是 NumberPicker（与原一致）；`MwSliderRow` 非玻璃态是 ±步进器。响铃页按钮已是液态皮（MwSecondaryButton 自动切换）。若真机（G0）帧率差，调 `mwGlassSupported()` 降级或减 blur。
 
 ## 快速验证

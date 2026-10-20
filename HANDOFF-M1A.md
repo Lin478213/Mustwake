@@ -1,6 +1,6 @@
 # HANDOFF — Phase 2 M1-A 执行进展交接
 
-> 交接时间：2026-10-19。M1-A1、M1-A2 已完成，M1-A3 起未动。
+> 交接时间：2026-10-19；2026-10-20 更新（M1-A3 spike 完成）。
 > 计划与硬约束见 `HANDOFF-PHASE2-PLAN.md`、`.omc/plans/phase2-execution.md`、`CLAUDE.md`；本文只记录**执行状态与接手要点**，不重复它们的内容。
 
 ## 状态总览
@@ -8,8 +8,8 @@
 | 任务 | 状态 | 提交 | GitHub |
 |---|---|---|---|
 | M1-A1 备份/恢复 JSON | ✅ 完成（代码评审 APPROVE） | `2456352` + `cd5466d` | 已推送 |
-| M1-A2 Roborazzi 截图基线 | ✅ 完成（代码评审 APPROVE） | `9cce785` | **未推送** |
-| M1-A3 Baseline Profile | ⬜ 未开始 | — | — |
+| M1-A2 Roborazzi 截图基线 | ✅ 完成（代码评审 APPROVE） | `9cce785` | 已推送 |
+| M1-A3 Baseline Profile | 🔄 spike 完成（评审 APPROVE），真实场景步骤 2-5 待做 | `build(baselineprofile)` spike 提交 | 未推送 |
 | M1-A4 a11y + 字符串 | ⬜ 未开始 | — | — |
 | M1-A5 崩溃/ANR 可观测性 | ⬜ 未开始 | — | — |
 | G0 真机门禁 | ⬜ 未开始 | — | — |
@@ -53,9 +53,9 @@
 - 依赖：`libs.versions.toml` pin `roborazzi = "1.76.0"`（AGP 9 兼容）+ `roborazzi-compose` + `jetbrains-compose-ui-test-junit4`（随 compose 1.12.0）。
 
 **常用命令**
-```powershell
-.\gradlew.bat :androidApp:recordRoborazziDebug   # 重新录制基线（UI 故意改版后）
-.\gradlew.bat :androidApp:verifyRoborazziDebug   # 对比基线（每次 UI 改动后跑）
+```bash
+./gradlew :androidApp:recordRoborazziDebug   # 重新录制基线（UI 故意改版后）
+./gradlew :androidApp:verifyRoborazziDebug   # 对比基线（每次 UI 改动后跑）
 ```
 
 **已知限制**（评审判定可接受；说明在 `ScreenshotTests.kt` KDoc）
@@ -69,24 +69,25 @@
 
 ## 遗留事项（按优先序）
 
-1. **推送 `9cce785` 到 GitHub**——上次推送授权只覆盖 M1-A1 两个提交。
+1. **推送 M1-A3 spike 提交到 GitHub**（`9cce785` 及之前的提交已在 origin；推送授权按会话确认）。
 2. **M1-A4 前置小项**（M1-A2 评审 LOW，非阻断）：
    - `ScreenshotTests.kt:81` `createComposeRule` 已弃用 → 迁 `androidx.compose.ui.test.junit4.v2.createComposeRule`。注意 v2 是排队调度语义，迁移后确认 `waitUntil` 同步点仍充分，并重跑 verifyRoborazziDebug ×2。
    - 可选：`org.jetbrains.compose.ui:ui-test-junit4` 换 `androidx.compose.ui:ui-test-junit4`（`androidApp` 是纯 Android 模块，依赖图更直接）。
 3. `exportJson` 失败仍外抛（设计使然：导出无部分提交，UI 已 catch）。若日后导出改多步写入需重新评估。
 4. Robolectric AGSL 限制（上节）：若未来 Robolectric 支持 `layout(color)`，可去掉 `MwSquircleFallback` 并重录基线。
+5. **生成 profile 提交策略**（M1-A3 spike 评审 Minor-2，已定）：`androidApp/src/release/generated/baselineProfiles/` 只提交真实场景 profile 正本（步骤 5 一并提交），spike 空场景 profile 不进仓库（跑完生成命令后手工清理或确认不误提交）。
 
 ---
 
-## 下一步：M1-A3 Baseline Profile
+## 下一步：M1-A3 步骤 2-5（真实场景）
 
-详细步骤在 `.omc/plans/phase2-execution.md` L89-108，接手要点：
+spike（步骤 1）已完成并独立提交——`:baselineprofile`（`com.android.test` → `:androidApp`）+ `androidx.benchmark.macro` 1.5.0 × AGP 9.3.2 内置 Kotlin + KMP `:shared` 兼容性成立，空场景全链路实测通过（评测任务 `:baselineprofile:connectedBenchmarkReleaseAndroidTest`、生成任务 `:androidApp:generateBaselineProfile`、变体分工与兼容区间等实测结论见 `.omc/plans/phase2-execution.md` M1-A3 步骤 1）。剩余步骤（同文件 L100-108）：
 
-- **第一步是兼容性 spike（独立小提交）**：`:baselineprofile` + `androidx.benchmark.macro` 与 AGP 9.3.2 内置 Kotlin + KMP `:shared` 的组合先跑通空场景；任务名以 `.\gradlew.bat :baselineprofile:tasks` 实测为准（AGP 9 下可能是 `generateBaselineProfile` 或变体化名字）。**spike 不通则本任务挂起标「待工具链升级」，不阻塞其余 M1-A**。
-- 新模块 `:baselineprofile`（`com.android.test`，`targetProjectPath = ":androidApp"`）；`androidApp` 挂 `androidx.baselineprofile` 插件 + `baselineProfile(project(":baselineprofile"))` + `profileinstaller`。
-- 场景：`MainActivityStartupBenchmark`、`RingingActivityStartupBenchmark`（`StartupTimingMetric`，cold start，各 ≥3 次迭代）。
+- 场景类：`MainActivityStartupBenchmark`、`RingingActivityStartupBenchmark`（`StartupTimingMetric`，cold start，各 ≥3 次迭代），替换 `EmptyStartupBenchmark`；`EmptyBaselineProfile` 换真实采集旅程。
+- **生成并落盘**：`./gradlew :androidApp:generateBaselineProfile -PbenchmarkAllowEmulator=true` → 产物自动落 `androidApp/src/release/generated/baselineProfiles/baseline-prof.txt`（插件自动挂进 release 源集，随最终 profile 提交；spike 实测路径，非原计划的 `src/main/`）。
+- **模拟器跑必须加 `-PbenchmarkAllowEmulator=true`**（spike 评审 Minor-1 门禁：默认严格，防 G0 静默收模拟器/低电量数字）；真机/G0 不带。
 - 模拟器 mustwake36（启动命令见 `mustwake/docs/testing.md`，需 `ANDROID_USER_HOME`/`ANDROID_AVD_HOME`）；无设备时标「待 G0」不阻塞。
-- 产物落 `androidApp/src/main/baselineProfiles/`；before/after P50/P90 记入 `mustwake/docs/testing.md`。Ringing 基准若被 FSI/turnScreenOn 干扰，G0 后校准。
+- before/after P50/P90 记入 `mustwake/docs/testing.md`；Ringing 基准若被 FSI/turnScreenOn 干扰，G0 后校准。
 
 ---
 
@@ -94,15 +95,15 @@
 
 - **每任务一个 git 提交**，conventional commits 英文；实现与 plan/spec 偏离时**先改 `.omc/` 文档再改码**。
 - **作者/评审分离**：executor 实现 → 独立验证（JUnit XML 计数，不信口头报告）→ code-reviewer 评审 → 修复 → 提交。评审 REVISE 时逐条修复并请复核。
-- 构建自包含：`cd E:\MustWake\mustwake` 后 `.\gradlew.bat`（JDK 21 / SDK 37 / Gradle 9.8.1 在 `toolchain/`，不设 JAVA_HOME）。镜像顺序在 `settings.gradle.kts`（Aliyun 优先）。
+- 构建自包含：`cd /home/lin/Java/MustWake/mustwake` 后 `./gradlew`（JDK 21 / SDK 37 / Gradle 9.8.1 在 `toolchain/`，不设 JAVA_HOME；2026-10-20 起为 Linux 工具链，旧 Windows 路径已失效）。镜像顺序在 `settings.gradle.kts`（Aliyun 优先）。
 - 硬约束（`HANDOFF-PHASE2-PLAN.md` §8）：compileSdk 37 不降；Miuix import 只在 `MwComponents.kt`；数据层放 `:data`；Room 迁移必须测试；试响不写 session/event；T8 真机是硬门禁；不加账号/云同步/广告/排行榜/睡眠周期。
 - 测试计数变化时同步 `CLAUDE.md` 与 `mustwake/docs/data-layer.md` 的数字。
 
 ## 快速验证
 
-```powershell
-cd E:\MustWake\mustwake
-.\gradlew.bat test                                # 158 例应全绿
-.\gradlew.bat :androidApp:verifyRoborazziDebug    # 截图对比应 15/15
-.\gradlew.bat :androidApp:assembleDebug           # 构建 APK
+```bash
+cd /home/lin/Java/MustWake/mustwake
+./gradlew test                                # 158 例应全绿
+./gradlew :androidApp:verifyRoborazziDebug    # 截图对比应 15/15
+./gradlew :androidApp:assembleDebug           # 构建 APK
 ```

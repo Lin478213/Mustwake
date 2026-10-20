@@ -97,14 +97,15 @@ M1-A(1..5) ──→ G0(真机) ──→ M1-B(1..5, M1 关闭) ──→ M2 ─
 
 步骤：
 1. **兼容性 spike**（独立小提交）：`:baselineprofile`/`androidx.benchmark.macro` 与 AGP 9.3.2 内置 Kotlin + KMP `:shared` 的组合先跑通空场景；任务名以 `.\gradlew.bat :baselineprofile:tasks` 实测为准（AGP 9 下可能是 `generateBaselineProfile` 或变体化任务名）。不通则此任务挂起标"待工具链升级"，不阻塞其余 M1-A。
+   **（2026-10-20 spike 实测结论，AGP 9.3.2 + benchmark/baselineprofile 1.5.0）**：兼容性成立，空场景全链路通过。任务名：connected 测试是**变体化**的 `:baselineprofile:connectedBenchmarkReleaseAndroidTest`（非计划原文的 `connectedBenchmarkAndroidTest`）；生成任务全局 `generateBaselineProfile` 存在，实际执行 `:androidApp:generateBaselineProfile`。变体分工（插件设计）：nonMinifiedRelease 变体跑 `BaselineProfileRule` 采集器，benchmarkRelease 变体跑 `MacrobenchmarkRule` 基准，互相 self-skip。兼容区间经插件源码/元数据确认为 AGP 8.0.0–10.0.0-alpha1。**模拟器跑需显式加 `-PbenchmarkAllowEmulator=true`**（评审 Minor-1 门禁：默认严格，`suppressErrors=EMULATOR,LOW-BATTERY` 与 `skipBenchmarksOnEmulator=false` 仅 opt-in 时生效，防 G0 静默收模拟器/低电量数字）；G0 真机跑不带该参数。
 2. `libs.versions.toml` 加 benchmark/baselineprofile 插件与 `androidx.profileinstaller`（pin 版本）；`settings.gradle.kts` `include(":baselineprofile")`。
 3. 新模块 `:baselineprofile`（`com.android.test`，targetProjectPath `:androidApp`）；`androidApp/build.gradle.kts` 应用 `androidx.baselineprofile` 插件 + `baselineProfile(project(":baselineprofile"))` + `implementation(profileinstaller)`。
 4. 场景类：`MainActivityStartupBenchmark`、`RingingActivityStartupBenchmark`（`StartupTimingMetric`，cold start，各 ≥3 次迭代）。
-5. **生成并落盘**：跑生成 profile 的任务（spike 确认的确切任务名，通常是 `:baselineprofile:generateBaselineProfile`）→ 产物拷/生成到 `androidApp/src/main/baselineProfiles/`；在 `docs/testing.md` 记录 before/after P50/P90。Ringing 基准若被 FSI/turnScreenOn 标志干扰（真机差异），G0 后校准。
+5. **生成并落盘**：跑生成 profile 的任务（spike 实测为 `:androidApp:generateBaselineProfile`，模拟器跑加 `-PbenchmarkAllowEmulator=true`）→ 产物自动生成到 `androidApp/src/release/generated/baselineProfiles/baseline-prof.txt` 并被插件自动挂进 release 源集（**偏离原文 `src/main/baselineProfiles/`**：baselineprofile 1.5.0 + AGP 9 的实际产物路径，无需手动拷贝，此目录随最终 profile 一并提交；**提交策略**：只提交真实场景 profile 正本，spike 空场景 profile 不进仓库）；在 `docs/testing.md` 记录 before/after P50/P90。Ringing 基准若被 FSI/turnScreenOn 标志干扰（真机差异），G0 后校准。
 
 **验收（可测）**：
 - `.\gradlew.bat :androidApp:assembleDebug` 产物含 profile（`aapt2 dump` 或 benchmark 报告佐证）。
-- `.\gradlew.bat :baselineprofile:connectedBenchmarkAndroidTest`（模拟器 mustwake36 可跑，启动命令见 `docs/testing.md`）出报告，P50/P90 记入文档；Ringing 冷启动 P50 有 before/after 对比。
+- `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest -PbenchmarkAllowEmulator=true`（模拟器 mustwake36 可跑，启动命令见 `docs/testing.md`；任务名以 spike 实测为准，真机不带 `-PbenchmarkAllowEmulator`）出报告，P50/P90 记入文档；Ringing 冷启动 P50 有 before/after 对比。
 - 无设备/模拟器时任务标记为"待 G0"，不阻塞其余 M1-A。
 
 ### M1-A4 a11y + 字符串基础设施
@@ -237,7 +238,7 @@ cd E:\MustWake\mustwake
 
 1. `feat(data): backup and restore alarms/settings as JSON`（M1-A1，含依赖 spike + 导入事务）
 2. `test(ui): add Roborazzi screenshot baselines`（M1-A2，先 2 张证伪再扩全量）
-3. `perf(startup): add baseline profile for Main/Ringing`（M1-A3，先兼容性 spike，需模拟器）
+3. `build(baselineprofile): add macrobenchmark pipeline spike`（M1-A3 步骤 1，空场景证管线，需模拟器）→ `perf(startup): add baseline profile for Main/Ringing`（M1-A3 步骤 2-5，真实场景 + 产物落盘）
 4. `feat(a11y): content descriptions and string resources`（M1-A4，依赖 2 的基线兜底）
 5. `feat(observability): local crash/ANR ring buffer`（M1-A5）
 6. **G0 真机** → `feat(ringing): add 10-second test ring`（M1-B1）

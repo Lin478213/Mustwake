@@ -43,6 +43,16 @@ JVM/截图测试编译不了 AGSL 的 `layout(color)` 与 `shader` 类型 unifor
 - `InteractiveHighlight` 的 AGSL 高光走白蒙层回退。
 真机路径不受影响（该恒为 true）。
 
+## Bug 记录
+
+### BUG-1 底栏 tab 选中态不跟随（2026-10-21 模拟器人工核对发现，**已修复并验证**）
+
+- **现象**：点底栏 tab（闹钟/历史/设置）后页面内容切换了，但底栏的选中滑块/高亮停在原 tab 不动。
+- **根因**：参考组件 `LiquidBottomTabs(selectedTabIndex: () -> Int)` 约定 getter 必须是**稳定 lambda**（背后读 State；参考 demo 捕获 `rememberSaveable` 状态对象，编译器记忆化后实例稳定）。`MwBottomBar` 原先传 `{ selectedIndex }`（捕获 Int 的不稳定 lambda）——每次选中变化 lambda 就是新实例，导致组件内部 `remember(selectedTabIndex)` / `LaunchedEffect(selectedTabIndex)` 重置，而拇指动画靠 `snapshotFlow { currentIndex }.drop(1)` 驱动的事件链断裂，`dampedDragAnimation` 收不到 animateToValue，拇指冻结。
+- **修复**（`MwComponents.kt` 适配层，1:1 移植文件未动）：getter 改为 `rememberUpdatedState` + `remember { { state.value } }` 固定实例。同一隐患在 `MwSwitch`/`MwSwitchRow`/`MwSlider`/`MwSliderRow`（LiquidToggle/LiquidSlider 的 getter）一并修复。
+- **验证**（模拟器实测）：点「历史」tab 拇指滑块随选中移动（设置→历史两张截图对比，拇指从右侧滑到中间，选中项蓝色高亮）；回归测试全绿。
+- **教训/约定**：往 `ui/design/liquid/` 组件传 getter 时必须用稳定 lambda（`remember { { state.value } }`），直接传 `{ param }` 是错的。
+
 ## 未完成事项（按优先序）
 
 1. ~~确认 `settings_liquid_light` 基线已录 + verify ×2~~ **已完成**（14/14 全绿，其一 `--rerun-tasks`）。

@@ -23,6 +23,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -316,9 +317,12 @@ fun MwSwitch(
     enabled: Boolean = true,
 ) {
     if (LocalMwGlassEnabled.current) {
+        // Stable getter contract (see MwBottomBar): read state behind a remembered lambda.
+        val checkedState = rememberUpdatedState(checked)
+        val selected = remember { { checkedState.value } }
         Box(modifier = modifier.alpha(if (enabled) 1f else 0.4f)) {
             LiquidToggle(
-                selected = { checked },
+                selected = selected,
                 onSelect = { if (enabled) onCheckedChange(it) },
                 backdrop = emptyBackdrop(),
             )
@@ -342,6 +346,9 @@ fun MwSwitchRow(
     modifier: Modifier = Modifier,
 ) {
     if (LocalMwGlassEnabled.current) {
+        // Stable getter contract (see MwBottomBar).
+        val checkedState = rememberUpdatedState(checked)
+        val selected = remember { { checkedState.value } }
         Row(
             modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -356,7 +363,7 @@ fun MwSwitchRow(
                 }
             }
             LiquidToggle(
-                selected = { checked },
+                selected = selected,
                 onSelect = onCheckedChange,
                 backdrop = emptyBackdrop(),
             )
@@ -446,13 +453,19 @@ fun MwBottomBar(
 ) {
     if (glassBackdrop != null) {
         val contentColor = if (isSystemInDarkTheme()) Color.White else Color.Black
+        // Contract of the reference components: the getters must be STABLE (read mutable state
+        // behind a remembered lambda). A lambda capturing an Int is recreated on every selection
+        // change, which re-keys LiquidBottomTabs' internal remember/LaunchedEffect and kills the
+        // snapshotFlow chain that drives the thumb animation (thumb would freeze in place).
+        val selectedIndexState = rememberUpdatedState(selectedIndex)
+        val selectedTabIndex = remember { { selectedIndexState.value } }
         Box(
             modifier = modifier
                 .fillMaxWidth()
                 .padding(horizontal = LiquidStyle.BarSideMargin, vertical = 8.dp),
         ) {
             LiquidBottomTabs(
-                selectedTabIndex = { selectedIndex },
+                selectedTabIndex = selectedTabIndex,
                 onTabSelected = onSelect,
                 backdrop = glassBackdrop,
                 tabsCount = tabs.size,
@@ -503,8 +516,11 @@ fun MwSlider(
     modifier: Modifier = Modifier,
 ) {
     if (LocalMwGlassEnabled.current) {
+        // Stable getter contract (see MwBottomBar).
+        val valueState = rememberUpdatedState(value)
+        val valueGetter = remember { { valueState.value.toFloat() } }
         LiquidSlider(
-            value = { value.toFloat() },
+            value = valueGetter,
             onValueChange = { onValueChange(it.toInt()) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             visibilityThreshold = 1f,
@@ -531,13 +547,16 @@ fun MwSliderRow(
     onChange: (Int) -> Unit,
 ) {
     if (LocalMwGlassEnabled.current) {
+        // Stable getter contract (see MwBottomBar).
+        val valueState = rememberUpdatedState(value)
+        val valueGetter = remember { { valueState.value.toFloat() } }
         Column(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Row {
                 MwText(text = title, typo = MwTypo.Body, modifier = Modifier.weight(1f))
                 MwText(text = "$value $suffix", typo = MwTypo.Caption)
             }
             LiquidSlider(
-                value = { value.toFloat() },
+                value = valueGetter,
                 onValueChange = { raw ->
                     val snapped = (raw / step).toInt().let { base ->
                         val candidates = listOf(base * step, (base + 1) * step)

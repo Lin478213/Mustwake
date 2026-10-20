@@ -22,6 +22,9 @@ import com.mustwake.alarm.ui.alarms.AlarmEditScreen
 import com.mustwake.alarm.ui.alarms.AlarmListScreen
 import com.mustwake.alarm.ui.design.MwBottomBar
 import com.mustwake.alarm.ui.design.LocalMwGlassEnabled
+import com.mustwake.alarm.ui.design.LocalMwDialogState
+import com.mustwake.alarm.ui.design.MwDialogHost
+import com.mustwake.alarm.ui.design.MwDialogState
 import com.mustwake.alarm.ui.design.MwFab
 import com.mustwake.alarm.ui.design.MwScaffold
 import com.mustwake.alarm.ui.design.MwTab
@@ -54,6 +57,7 @@ fun App(container: AppContainer, actions: AlarmUiActions) {
         val settingsState by container.settingsRepository.settings.collectAsState(initial = null)
         val settings = settingsState ?: return@MwTheme
         val glassBackdrop = rememberLayerBackdrop()
+        val dialogState = remember { MwDialogState() }
         var tab by remember { mutableStateOf(AppTab.Alarms) }
         var editor by remember { mutableStateOf<EditorTarget?>(null) }
         var showPermissions by remember { mutableStateOf(false) }
@@ -80,7 +84,10 @@ fun App(container: AppContainer, actions: AlarmUiActions) {
             return@MwTheme
         }
 
-        CompositionLocalProvider(LocalMwGlassEnabled provides settings.liquidGlassEnabled) {
+        CompositionLocalProvider(
+            LocalMwGlassEnabled provides settings.liquidGlassEnabled,
+            LocalMwDialogState provides dialogState,
+        ) {
             MwScaffold(topBar = { MwTopBar(title = tab.title) }) { padding ->
                 Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                     // Only the screen subtree is captured: the bar can blur what scrolls beneath it
@@ -120,9 +127,15 @@ fun App(container: AppContainer, actions: AlarmUiActions) {
                         ),
                         selectedIndex = tab.ordinal,
                         onSelect = { tab = AppTab.entries[it] },
-                        floating = settings.floatingBottomBarEnabled,
                         glassBackdrop = if (settings.liquidGlassEnabled) glassBackdrop else null,
                         modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+
+                    // Hosted outside the captured screen layer so the glass panel refracts
+                    // content beneath it (same rule as the bottom bar).
+                    MwDialogHost(
+                        glassBackdrop = if (settings.liquidGlassEnabled) glassBackdrop else null,
+                        state = dialogState,
                     )
                 }
             }

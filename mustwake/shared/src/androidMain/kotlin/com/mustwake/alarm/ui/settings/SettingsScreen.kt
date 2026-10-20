@@ -25,15 +25,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.mustwake.alarm.data.AppContainer
 import com.mustwake.alarm.data.backup.ImportMode
 import com.mustwake.alarm.data.backup.ImportReport
 import com.mustwake.alarm.data.settings.AppSettings
+import com.mustwake.alarm.ui.design.LocalMwDialogState
 import com.mustwake.alarm.ui.design.MwCard
+import com.mustwake.alarm.ui.design.MwDialogSpec
 import com.mustwake.alarm.ui.design.MwPrimaryButton
 import com.mustwake.alarm.ui.design.MwSecondaryButton
 import com.mustwake.alarm.ui.design.MwSectionTitle
+import com.mustwake.alarm.ui.design.MwSliderRow
 import com.mustwake.alarm.ui.design.MwSwitchRow
 import com.mustwake.alarm.ui.design.MwText
 import com.mustwake.alarm.ui.design.MwTypo
@@ -52,9 +54,9 @@ fun SettingsScreen(container: AppContainer, onOpenPermissions: () -> Unit = {}) 
     val scope = rememberCoroutineScope()
     val glassSupported = mwGlassSupported()
     val context = LocalContext.current
+    val dialogState = LocalMwDialogState.current
     val alarms by container.alarmRepository.observeAlarms().collectAsState(initial = emptyList())
     var resultText by remember { mutableStateOf<String?>(null) }
-    var showReplaceConfirm by remember { mutableStateOf(false) }
     var pendingImportMode by rememberSaveable { mutableStateOf(ImportMode.MERGE) }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -120,17 +122,9 @@ fun SettingsScreen(container: AppContainer, onOpenPermissions: () -> Unit = {}) 
         MwSectionTitle(text = "外观", modifier = Modifier.padding(top = 16.dp))
         MwCard(modifier = Modifier.fillMaxWidth()) {
             MwSwitchRow(
-                title = "悬浮底栏",
-                summary = "主界面使用悬浮导航栏样式",
-                checked = settings.floatingBottomBarEnabled,
-                onCheckedChange = { enabled ->
-                    scope.launch { container.settingsRepository.setFloatingBottomBarEnabled(enabled) }
-                },
-            )
-            MwSwitchRow(
                 title = "液态玻璃",
                 summary = if (glassSupported) {
-                    "半透明模糊表面与高光描边"
+                    "开启后底栏、开关、按钮、滑块与对话框为液态玻璃样式（1:1 AndroidLiquidGlass）"
                 } else {
                     "此设备不支持实时模糊，将使用半透明纯色"
                 },
@@ -143,7 +137,7 @@ fun SettingsScreen(container: AppContainer, onOpenPermissions: () -> Unit = {}) 
 
         MwSectionTitle(text = "步数", modifier = Modifier.padding(top = 16.dp))
         MwCard(modifier = Modifier.fillMaxWidth()) {
-            MwStepperRow(
+            MwSliderRow(
                 title = "默认目标步数",
                 value = settings.defaultGoalSteps,
                 range = 10..500,
@@ -213,42 +207,22 @@ fun SettingsScreen(container: AppContainer, onOpenPermissions: () -> Unit = {}) 
             MwSecondaryButton(
                 text = "替换导入",
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                onClick = { showReplaceConfirm = true },
-            )
-            resultText?.let {
-                MwText(text = it, typo = MwTypo.Caption, modifier = Modifier.padding(top = 8.dp))
-            }
-        }
-    }
-
-    if (showReplaceConfirm) {
-        Dialog(onDismissRequest = { showReplaceConfirm = false }) {
-            MwCard(modifier = Modifier.fillMaxWidth()) {
-                MwText(text = "替换导入", typo = MwTypo.Headline)
-                MwText(
-                    text = "将删除现有 ${alarms.size} 个闹钟，并用备份中的闹钟替换。设置也会被备份覆盖。",
-                    typo = MwTypo.Body,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    MwSecondaryButton(
-                        text = "取消",
-                        modifier = Modifier.weight(1f),
-                        onClick = { showReplaceConfirm = false },
-                    )
-                    MwPrimaryButton(
-                        text = "确认替换",
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            showReplaceConfirm = false
+                onClick = {
+                    dialogState.spec = MwDialogSpec(
+                        title = "替换导入",
+                        text = "将删除现有 ${alarms.size} 个闹钟，并用备份中的闹钟替换。设置也会被备份覆盖。",
+                        confirmText = "确认替换",
+                        onConfirm = {
                             pendingImportMode = ImportMode.REPLACE
                             importLauncher.launch(BACKUP_MIME_TYPES)
                         },
+                        dismissText = "取消",
+                        onDismiss = {},
                     )
-                }
+                },
+            )
+            resultText?.let {
+                MwText(text = it, typo = MwTypo.Caption, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }

@@ -1,80 +1,84 @@
-# Appearance toggles and liquid glass (T6)
+# Appearance: liquid glass (1:1 from AndroidLiquidGlass)
 
-Status: **complete** (2026-10-19). Visual verification on a device is still pending (T8).
+Status: **rework 2026-10-20** — the earlier hand-rolled glass (blur 24dp + 55% tint + stroke) is
+replaced by a 1:1 port of [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)
+(`kmp` branch, cloned at repo root `AndroidLiquidGlass/`, gitignored as upstream reference).
 
-## Toggles
+## Single toggle
 
 | setting | default | effect |
 |---|---|---|
-| `floatingBottomBarEnabled` | `false` | bottom navigation becomes a centered floating pill |
-| `liquidGlassEnabled` | `false` | bars/cards use translucent glass surfaces with a lit edge |
+| `liquidGlassEnabled` | `false` | **one switch controls everything**: floating liquid capsule bottom tabs + liquid toggle/button/slider/dialog + glass cards |
 
-They are independent: `floating × glass` produces four valid combinations, all covered by
-Robolectric smoke tests. Both values live in DataStore (`AppSettings`) and survive restarts.
+- ON  → full liquid experience (see component spec below)
+- OFF → previous plain styles (full-width Miuix `NavigationBar`, Miuix controls)
 
-## Floating bottom bar
+The former `floatingBottomBarEnabled` toggle was **merged away** (user decision 2026-10-20).
+The `AppSettings` field remains for backup schema v1 round-trip but is no longer read by the UI
+and is deprecated (`docs/data-layer.md`).
 
-Miuix's `FloatingNavigationBar` paints its own opaque pill, so it cannot host a backdrop without
-fighting that background. The adapter (`MwComponents.kt`) composes the pill from
-`FloatingNavigationBarItem`s inside a `Row` with `RoundedCornerShape(28.dp)`:
+## Component spec (1:1 parameters)
 
-```
-floating + solid  -> surfaceContainer pill
-floating + glass  -> blurred captured content + 55% tint + Highlight stroke
-```
+All values extracted from the reference sources (`app/src/commonMain/.../catalog/`), see
+`ui/design/liquid/LiquidStyle.kt` for the constants and the ported files for behavior.
 
-The standard bar is still `Miuix NavigationBar` (transparent when glass is on) with a glass layer
-behind it.
+### Bottom tabs (`LiquidBottomTabs` / `LiquidBottomTab`)
+- side margin **36dp**; outer capsule height **64dp**, inner padding **4dp**; inner bar/thumb **56dp**
+- tab item: icon **28dp**, label **12sp**, icon-label gap **2dp**
+- glass: `vibrancy(); blur(8dp); lens(24dp, 24dp)`; surface `#FAFAFA@40%` light / `#121212@40%` dark
+- thumb: combined backdrop (page + accent-tinted tab layer) + `lens(10dp·p, 14dp·p, chromaticAberration)`
+  + `Highlight.Default·p` + `Shadow·p` + `InnerShadow(8dp·p, p)`
+- dynamics: `DampedDragAnimation` (drag-to-switch, press scale 78/56, velocity stretch),
+  `InteractiveHighlight` (pointer/selection-following light), 4dp drag offset rebound,
+  selected tab content scale 1→1.2
 
-## Liquid glass
+### Buttons (`LiquidButton`)
+- height **48dp**, horizontal padding **16dp**, content gap **8dp**, `Capsule()`
+- glass: `vibrancy(); blur(2dp); lens(12dp, 24dp)`; drag-follow press deformation
 
-`io.github.kyant0:backdrop` 2.0.1 has no high-level component, so the glass is composed from:
+### Toggle (`LiquidToggle`)
+- track **64×28dp** (color lerps track→accent with value), thumb **40×24dp**, drag width 20dp
+- accent `#34C759` light / `#30D158` dark; press scale 1.5, chromatic lens on press
 
-1. `rememberLayerBackdrop()` + `Modifier.layerBackdrop(...)` on the **screen subtree only** (list /
-   settings / history), so the bar never captures itself and the blur cannot feed back;
-2. `Modifier.drawBackdrop(backdrop, shape) { blur(24.dp) }` with `Highlight.Default`;
-3. a translucent `surface` tint (55%) over the blur.
+### Slider (`LiquidSlider`)
+- track **6dp** capsule, thumb **40×24dp** glass capsule; tap-to-jump + drag
 
-Cards use a lighter-weight glass: translucent `surface` (72%) + 0.5 dp white edge. Blurring them
-would self-capture the screen layer and produce ghosting, so blur is reserved for the bar that
-overlays scrolling content.
+### Dialog (`LiquidDialog`)
+- outer margin **40dp**, `RoundedRectangle(48dp)`
+- glass: `colorControls(brightness 0.2 light/saturation 1.5); blur(16dp light/8dp dark);
+  lens(24dp, 48dp, depthEffect=true)` + `Highlight.Plain`; scrim `#29293A@23%` light / `#121212@56%` dark
 
-### Degradation
+### Typography / margins (global, always applied — not toggle-gated)
+- type scale (BasicText): Display **28sp Medium** · dialog title **24sp Medium** · body large **17sp** ·
+  body/button **15–16sp** · secondary **15sp @68%** · labels **12sp**
+- accent `#0088FF` light / `#0091FF` dark (15sp Medium for accent text)
+- bottom bar side margin 36dp; content margins follow the reference scaffold (see `docs/ui.md`)
 
-`mwGlassSupported()` = `isRenderEffectSupported() && !ActivityManager.isLowRamDevice`.
+## Degradation
 
-- unsupported / low-RAM → glass surfaces fall back to a 94% opaque surface (still readable, no
-  crash); the settings summary explains this to the user;
-- cards keep the translucent tint + edge (cheap, no shader);
-- blur is only requested when the toggle is on, so the default path allocates no capture.
+`mwGlassSupported()` = `isRenderEffectSupported() && !isLowRamDevice` (unchanged).
 
-## Layout consequences
+- unsupported / low-RAM → glass surfaces fall back to a 94% opaque surface; liquid controls
+  fall back to their plain (non-glass) drawing
+- Robolectric / JVM screenshots: `MwSquircleFallback` disables AGSL paths (`layout(color)`
+  shaders cannot compile there). `lens()` no-ops when runtime shaders are unsupported;
+  `Highlight` uses `Plain`. Screenshots therefore show the degraded path — real look is
+  verified on the emulator/device.
+- `LiquidToggle`/`LiquidSlider` glass thumbs still draw their non-shader parts in tests.
 
-- The bar is now an overlay inside the content area (not Scaffold's `bottomBar`), so lists scroll
-  beneath it and the blur has content to sample.
-- List/history/settings reserve 120 dp bottom padding; the FAB sits 112 dp above the bottom.
-- Bar height/padding is handled by Miuix items, so the floating pill keeps MIUI spacing.
+## Where liquid components are used
+
+| component | MustWake surface |
+|---|---|
+| LiquidBottomTabs | main nav (闹钟/历史/设置) |
+| LiquidToggle | all settings switches |
+| LiquidButton | settings actions, backup import/export, ringing snooze |
+| LiquidSlider | goal-steps control (edit screen + settings default) when glass ON |
+| LiquidDialog | backup REPLACE confirmation |
+
+Behavior is identical between toggle states; only the skin/interaction animation changes.
 
 ## Tests
 
-`:androidApp:testDebugUnitTest` — 23 tests, including 5 UI smoke tests:
-
-| test | combination |
-|---|---|
-| default | floating off, glass off |
-| floating only | on / off |
-| glass only | off / on |
-| both | on / on |
-| ringing screen | composes with extras |
-
-Total suite: **120 tests** (data 97, app 23). Robolectric cannot judge blur quality; it only proves
-the composition path (including the glass draw) does not crash.
-
-## Known gaps
-
-- Real-device blur quality, contrast and frame rate are **unverified** (no device).
-- Dialogs are not implemented yet (the permission guide uses cards), so "glass dialog" stays on
-  the polish list until a dialog is actually introduced.
-- Monet dynamic color is still not enabled; theme follows light/dark only.
-- Low-RAM fallback is a capability guess; on-device frame timing may require lowering the 24 dp
-  blur radius.
+- UI smoke: glass ON/OFF two states + component cases (Robolectric composes degraded path)
+- Roborazzi baselines re-recorded for the new UI (`recordRoborazziDebug`)

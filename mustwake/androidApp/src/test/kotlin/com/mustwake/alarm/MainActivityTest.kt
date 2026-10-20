@@ -10,8 +10,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Smoke tests: the Miuix shell must compose through onboarding and every combination of the two
- * independent appearance toggles (floating bottom bar / liquid glass).
+ * Smoke tests: the Miuix shell must compose through onboarding and both states of the single
+ * liquid-glass toggle (plain shell / liquid shell).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -49,8 +49,8 @@ class MainActivityTest {
     }
 
     @Test
-    fun `floating bar composes without glass`() {
-        prepare(onboardingCompleted = true, floating = true, glass = false)
+    fun `plain shell composes with glass off`() {
+        prepare(onboardingCompleted = true, glass = false)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
 
@@ -60,19 +60,8 @@ class MainActivityTest {
     }
 
     @Test
-    fun `glass bar composes while floating is off`() {
-        prepare(onboardingCompleted = true, floating = false, glass = true)
-
-        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
-
-        assertNotNull(controller.get())
-        controller.pause().stop().destroy()
-        prepare(onboardingCompleted = true)
-    }
-
-    @Test
-    fun `both toggles compose together`() {
-        prepare(onboardingCompleted = true, floating = true, glass = true)
+    fun `liquid shell composes with glass on`() {
+        prepare(onboardingCompleted = true, glass = true)
 
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
 
@@ -83,13 +72,11 @@ class MainActivityTest {
 
     private fun prepare(
         onboardingCompleted: Boolean,
-        floating: Boolean = false,
         glass: Boolean = false,
     ) {
         val app = ApplicationProvider.getApplicationContext<MustWakeApp>()
         runBlocking {
             app.container.settingsRepository.setOnboardingCompleted(onboardingCompleted)
-            app.container.settingsRepository.setFloatingBottomBarEnabled(floating)
             app.container.settingsRepository.setLiquidGlassEnabled(glass)
         }
     }

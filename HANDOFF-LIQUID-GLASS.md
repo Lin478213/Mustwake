@@ -1,0 +1,72 @@
+# HANDOFF — 液态玻璃 1:1 复刻（AndroidLiquidGlass）执行交接
+
+> 交接时间：2026-10-21。**实现代码已完成，验证/基线未全部收尾**。
+> 批准的计划：`~/.claude/plans/crispy-napping-flamingo.md`（一比一复刻 AndroidLiquidGlass + 全局字体/间距 + 单开关统一控制）。
+> 上一交接：`HANDOFF-M1A.md`（M1-A1~A3 已完成）。本文只记录本任务状态与接手要点。
+
+## 需求（用户原话要点）
+
+1. 悬浮底栏和液态玻璃按 GitHub `Kyant0/AndroidLiquidGlass` **一比一复刻**（此前手工近似被否定）；
+2. **字体和边上间距**也不对 → 全局对齐参考项目；
+3. 能用上的组件全用上，**特性由「液态玻璃」一个开关统一控制**（「悬浮底栏」开关移除）；
+4. 不走 OMC 工作流；先计划后实施（计划已获批准）。
+
+## 状态总览
+
+| 项 | 状态 |
+|---|---|
+| 参考仓克隆（`AndroidLiquidGlass/`，kmp 分支，gitignore） | ✅ |
+| 依赖：backdrop 2.0.1（API 实测含 Lens/vibrancy/Highlight/Shadow）+ 显式 `kyant-shapes` 1.2.1 | ✅ |
+| 文档先行：appearance.md 重写、ui.md 字号阶、CLAUDE.md 不变量、decisions.md、data-layer.md | ✅ |
+| `ui/design/liquid/` 组件移植（8 文件，约 1200 行） | ✅ |
+| 适配层接线：MwComponents/App/SettingsScreen/AlarmEditScreen（单开关、对话框宿主、字号阶） | ✅ |
+| JVM 回归（**156 例 0 失败**，JUnit XML 计数） | ✅ |
+| 截图基线 **14 张全部录制**（含 shell_liquid_light 液态壳、settings_liquid_light 控件态） | ✅ |
+| `verifyRoborazziDebug` 连续两次全绿（其一 `--rerun-tasks` 强制实跑） | ✅ |
+| 模拟器人工核对（拖动拇指/按压/色差/对话框） | ⬜ 未做（模拟器窗口曾开过，app 装的是旧 UI） |
+| git 提交 | ⬜ 未提交（全部在工作区） |
+
+## 一比一参数与移植映射（实现已落）
+
+- 参数基线（36dp 边距/64-56dp 高度/28dp 图标/12sp 标签、玻璃配方 vibrancy+blur+lens、动效 DampedDragAnimation/InteractiveHighlight 等）见 `mustwake/docs/appearance.md`；常量集中在 `LiquidStyle.kt`。
+- 移植文件：`shared/src/androidMain/kotlin/com/mustwake/alarm/ui/design/liquid/`——
+  `LiquidBottomTabs/LiquidBottomTab/LiquidButton/LiquidToggle/LiquidSlider/LiquidDialog/DampedDragAnimation/DragGestureInspector/InteractiveHighlight/LiquidStyle`。
+- 单开关语义：`liquidGlassEnabled` 开 = 悬浮液态胶囊底栏 + 液态开关/按钮/滑块 + 玻璃对话框；关 = 原 Miuix 全宽底栏/控件。`floatingBottomBarEnabled` 字段保留（备份 schema v1 兼容）但 UI 不再暴露（`docs/data-layer.md` 已标 deprecated）。
+- 全局字号阶（`MwText` 映射 `LiquidStyle`）：Display 28sp Medium / Title 24sp Medium / Headline 17sp / Body 16sp / Label 15sp / Caption 12sp；内容边距 16dp 与参考一致，底栏 36dp。
+- 对话框：`MwDialogState` + `MwDialogHost` 由 `App` 在**捕获层外**宿主（玻璃折射不自捕获）；REPLACE 导入确认已改走对话框。
+
+## Robolectric 降级（重要，勿删）
+
+JVM/截图测试编译不了 AGSL 的 `layout(color)` 与 `shader` 类型 uniform（实测报错两种）。降级沿用既有机制 `LocalMwAgslHighlightEnabled`（`MwSquircleFallback` 置 false）：
+- `lens(...)` 调用全部 `if (agslHighlight)` 跳过；
+- `Highlight.Default/Ambient` → `Highlight.Plain`；**注意 `drawBackdrop` 的 `highlight` 参数默认值就是 `Highlight.Default`**，不显式传就会在测试态炸（外层胶囊行、LiquidButton 已显式传）；
+- `InteractiveHighlight` 的 AGSL 高光走白蒙层回退。
+真机路径不受影响（该恒为 true）。
+
+## 未完成事项（按优先序）
+
+1. ~~确认 `settings_liquid_light` 基线已录 + verify ×2~~ **已完成**（14/14 全绿，其一 `--rerun-tasks`）。
+2. **`dialog_liquid_light` 截图用例**（玻璃对话框基线）——已留 TODO 在 `ScreenshotTests.kt`。两条路任选：
+   a) `androidApp/build.gradle.kts` 加 `testImplementation(libs.backdrop)`（或 `libs.kyant.shapes` + compose foundation）后直接截 `LiquidDialog`；
+   b) 经 App 壳 compose，点「替换导入」触发 `MwDialogHost` 再截图（不需额外依赖）。
+3. **模拟器人工核对**（计划验证 §1-3）：装 debug 包 → 开液态玻璃 → 核对底栏胶囊/36dp/12sp、**拖拇指切 tab、按压缩放 78/56、色差折射、跟手高光**、LiquidToggle/LiquidSlider/按钮、玻璃对话框；关开关回退无残留。与参考 demo 对照可装仓库内 `AndroidLiquidGlass/androidApp` 的 catalog（可选）。
+4. **推送**：`git push` 在本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推；连同 M1-A3 的三个未推提交（`6eeba11`/`812323c`/`8f42674`）一起推。
+5. 小项：`MwSlider` 非玻璃态是 NumberPicker（与原一致）；`MwSliderRow` 非玻璃态是 ±步进器。响铃页按钮已是液态皮（MwSecondaryButton 自动切换）。若真机（G0）帧率差，调 `mwGlassSupported()` 降级或减 blur。
+
+## 快速验证
+
+```bash
+cd /home/lin/Java/MustWake/mustwake
+./gradlew test                             # 应全绿（截图用例非 roborazzi 模式自动跳过）
+./gradlew :androidApp:recordRoborazziDebug # 重录基线（UI 故意改版后）
+./gradlew :androidApp:verifyRoborazziDebug # 连续两次应全绿
+./gradlew :androidApp:assembleDebug        # 构建 APK
+```
+
+## 关键文件
+
+- 计划：`~/.claude/plans/crispy-napping-flamingo.md`（1:1 参数基线表）
+- 规格：`mustwake/docs/appearance.md`（组件参数）、`mustwake/docs/ui.md`（字号阶/结构）
+- 移植源：`/home/lin/Java/MustWake/AndroidLiquidGlass/`（kmp 分支；`app/src/commonMain/.../catalog/components|utils|destinations/DialogContent.kt`）
+- 适配层：`mustwake/shared/src/androidMain/kotlin/com/mustwake/alarm/ui/design/MwComponents.kt`、`ui/design/liquid/`
+- 接线：`App.kt`（单开关 + MwDialogHost）、`SettingsScreen.kt`（外观区 + REPLACE 对话框）、`AlarmEditScreen.kt`（目标步数滑块）

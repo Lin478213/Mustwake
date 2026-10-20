@@ -19,6 +19,7 @@ toolchain/
 # Upstream references (read-only reference code, not this project)
 oh-my-claudecode/
 oh-my-claudecode-port/
+AndroidLiquidGlass/
 
 # OS noise
 .DS_Store

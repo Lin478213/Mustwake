@@ -14,6 +14,7 @@ shared/src/androidMain/kotlin/com/mustwake/alarm/
    ├─ AlarmUiActions.kt          # schedule/cancel callbacks implemented by :androidApp
    ├─ TimeText.kt                # time + repeat-day formatting
    ├─ design/MwComponents.kt     # the ONLY file importing Miuix
+   ├─ design/liquid/             # 1:1 port of Kyant0/AndroidLiquidGlass components (no Miuix)
    ├─ alarms/AlarmListScreen.kt
    ├─ alarms/AlarmEditScreen.kt
    ├─ history/HistoryScreen.kt
@@ -28,13 +29,38 @@ shared/src/androidMain/kotlin/com/mustwake/alarm/
 
 `MwComponents.kt` exposes semantic wrappers: `MwTheme`, `MwScaffold`, `MwTopBar`, `MwCard`,
 `MwText` + `MwTypo`, `MwPrimaryButton`, `MwSecondaryButton`, `MwChip`, `MwSwitch`, `MwSwitchRow`,
-`MwTextField`, `MwNumberPicker`, `MwProgressBar`, `MwFab`, `MwIconAction`, `MwBottomBar`.
+`MwTextField`, `MwNumberPicker`, `MwProgressBar`, `MwFab`, `MwIconAction`, `MwBottomBar`, `MwSlider`.
+
+When `liquidGlassEnabled` is on, the wrappers delegate to the 1:1 ported liquid components in
+`ui/design/liquid/` (`LiquidBottomTabs`, `LiquidToggle`, `LiquidButton`, `LiquidSlider`,
+`LiquidDialog` + `DampedDragAnimation`/`InteractiveHighlight`); off keeps the plain Miuix skin.
+Spec: `appearance.md`.
 
 Rules:
 
 - screens may import Compose foundation/runtime, never Miuix;
-- new Miuix components are added here first, with a semantic name;
-- theme = system light/dark for now; Monet/dynamic colors land with T6.
+- **Miuix imports stay confined to `MwComponents.kt`**; `ui/design/liquid/*` uses Compose
+  `BasicText` + `com.kyant.shapes` + `io.github.kyant0:backdrop` only (no Miuix);
+- new Miuix components are added to `MwComponents.kt` first, with a semantic name;
+- theme = system light/dark; accent `#0088FF`/`#0091FF` on liquid surfaces.
+
+## Typography & margins (global)
+
+Aligned with the reference project (always applied, not toggle-gated); mapping lives in
+`MwText`/`LiquidStyle.kt`:
+
+| role | size / weight |
+|---|---|
+| Display (大标题) | 28sp Medium |
+| dialog title | 24sp Medium |
+| body large | 17sp |
+| body / button | 15–16sp |
+| secondary (说明) | 15sp @68% |
+| labels / tab labels | 12sp |
+
+- bottom bar side margin 36dp; content sections use the reference scaffold margins
+  (see `LiquidStyle.kt` constants);
+- accent text `#0088FF`/`#0091FF` 15sp Medium.
 
 ## Screens
 
@@ -42,9 +68,9 @@ Rules:
 |---|---|
 | 闹钟列表 | Room `observeAlarms`; time/label/repeat/goal; next ring (`今天/明天/周X HH:mm`, refreshed every 30 s); enable switch reschedules or cancels; tap opens editor; FAB creates |
 | 权限引导 | first-run gate + 设置入口；通知/身体活动运行时请求，精确闹钟/FSI/电池/自启动跳系统页；返回时刷新状态（见 `permissions.md`） |
-| 新建/编辑 | hour/minute `NumberPicker`; label `TextField` (≤40); goal 10–500; 7 repeat chips + 每天; save → repository + schedule; delete for existing |
+| 新建/编辑 | hour/minute `NumberPicker`; label `TextField` (≤40); goal 10–500 (liquid slider when glass ON, picker when OFF); 7 repeat chips + 每天; save → repository + schedule; delete for existing |
 | 历史 | newest 100 events; alarm label + local time + type + steps + reason; empty state |
-| 设置 | floating bar / liquid glass switches (persisted; visual effect T6); goal/snooze/max-snooze/shake steppers bound to DataStore with validation |
+| 设置 | liquid glass switch (single visual toggle, persisted); goal/snooze/max-snooze/shake steppers bound to DataStore with validation |
 | 响铃 | Miuix full screen: time, label, step or shake progress, snooze (disabled at limit), 10 s hold-to-stop |
 
 Navigation is a simple `AppTab` + editor state (no navigation library), per plan's
@@ -71,8 +97,8 @@ planned with T6 visual work (needs a screenshot library such as Roborazzi).
 
 ## Deferred / known gaps
 
-- 悬浮底栏、液态玻璃：已在 T6 实现，见 `docs/appearance.md`。
+- 液态玻璃：2026-10-20 起为 AndroidLiquidGlass 1:1 移植（单开关统一控制），见 `docs/appearance.md`。
 - 首次启动权限引导：已在 T7 实现，见 `docs/permissions.md`。
 - 编辑页未暴露"启用"开关；新建默认启用，切换在列表页完成。
-- 无 UI 截图基线；Material 风格兜底不存在，Miuix 是唯一实现。
+- Robolectric 截图基线反映降级渲染（AGSL 不可编译）；真机视觉与动效以模拟器/真机人工核对为准。
 - Robolectric Compose 只验证"能组合"，不验证像素与交互手势。

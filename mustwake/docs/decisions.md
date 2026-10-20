@@ -23,3 +23,18 @@
   页面只依赖 `Mw*` 组件。未来若要换 UI 实现，只改适配层。
 - 如果将来要做 iOS/桌面，或团队明确以 Flutter 为主，建议在 T8 真机验收后再评估
   「Flutter 只做非响铃页、响铃页保留原生」的混合方案。
+
+## 液态玻璃：一比一移植 Kyant0/AndroidLiquidGlass（2026-10-20）
+
+- **参照源**：`Kyant0/AndroidLiquidGlass`（GitHub 4.2k stars）`kmp` 分支（活跃主线，2026-08；
+  `android` 分支是 1.0.6 冻结旧线，组件集相同无独有内容）。仓库克隆在根目录
+  `AndroidLiquidGlass/`（gitignore，作为上游参考）。
+- **不内嵌库**：继续用 Maven `io.github.kyant0:backdrop:2.0.1`（缓存已验证含
+  Lens/vibrancy/Highlight/Shadow/CombinedBackdrop 全 API，Maven 最新即 2.0.1）+ 显式
+  `io.github.kyant0:shapes:1.2.1`（Capsule/RoundedRectangle）；只移植参考的 catalog 组件层
+  源码（`ui/design/liquid/`）。
+- **开关语义**（用户确认）：`liquidGlassEnabled` 单开关统一控制全部液态特性；
+  `floatingBottomBarEnabled` 并入废弃（字段保留做备份 schema v1 兼容）。
+- **排版**（用户确认）：字体/间距全局对齐参考（28/24/17/16/15/12sp 字号阶、底栏 36dp 边距）。
+- 早先手工近似玻璃（blur 24dp + 55% tint）废弃；动效（拖动拇指/按压/色差/跟手高光）按参考
+  原逻辑保留，不做简化。

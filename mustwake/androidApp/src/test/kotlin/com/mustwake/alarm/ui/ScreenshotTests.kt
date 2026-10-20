@@ -26,6 +26,7 @@ import com.mustwake.alarm.data.db.AlarmEventEntity
 import com.mustwake.alarm.data.db.AlarmEventType
 import com.mustwake.alarm.ui.alarms.AlarmEditScreen
 import com.mustwake.alarm.ui.alarms.AlarmListScreen
+import com.mustwake.alarm.ui.design.LocalMwGlassEnabled
 import com.mustwake.alarm.ui.design.MwSquircleFallback
 import com.mustwake.alarm.ui.design.MwTheme
 import com.mustwake.alarm.ui.design.MwThemeBackground
@@ -110,7 +111,6 @@ class ScreenshotTests {
             withContext(Dispatchers.IO) { container.database.clearAllTables() }
             val settings = container.settingsRepository
             settings.setOnboardingCompleted(true)
-            settings.setFloatingBottomBarEnabled(false)
             settings.setLiquidGlassEnabled(false)
         }
     }
@@ -183,7 +183,7 @@ class ScreenshotTests {
     @Test
     fun settings_light() {
         if (!roborazziActive()) return
-        captureScreen("settings_light", waitText = "悬浮底栏") {
+        captureScreen("settings_light", waitText = "液态玻璃") {
             SettingsScreen(container = container())
         }
     }
@@ -191,7 +191,7 @@ class ScreenshotTests {
     @Test
     fun settings_dark() {
         if (!roborazziActive()) return
-        captureScreen("settings_dark", dark = true, waitText = "悬浮底栏") {
+        captureScreen("settings_dark", dark = true, waitText = "液态玻璃") {
             SettingsScreen(container = container())
         }
     }
@@ -246,47 +246,46 @@ class ScreenshotTests {
         }
     }
 
-    // ---------- shell: floating bottom bar x liquid glass ----------
+    // ---------- shell: liquid glass toggle ----------
 
     @Test
     fun shell_solid_light() {
         if (!roborazziActive()) return
-        prepareShell(floating = false, glass = false)
+        prepareShell(glass = false)
         captureScreen("shell_solid_light", waitText = "闹钟") {
             App(container = container(), actions = NOOP_ACTIONS)
         }
     }
 
     @Test
-    fun shell_floating_light() {
+    fun shell_liquid_light() {
         if (!roborazziActive()) return
-        prepareShell(floating = true, glass = false)
-        captureScreen("shell_floating_light", waitText = "闹钟") {
+        prepareShell(glass = true)
+        captureScreen("shell_liquid_light", changeThreshold = GLASS_CHANGE_THRESHOLD, waitText = "闹钟") {
             App(container = container(), actions = NOOP_ACTIONS)
         }
     }
 
-    @Test
-    fun shell_glass_light() {
-        if (!roborazziActive()) return
-        prepareShell(floating = false, glass = true)
-        captureScreen("shell_glass_light", changeThreshold = GLASS_CHANGE_THRESHOLD, waitText = "闹钟") {
-            App(container = container(), actions = NOOP_ACTIONS)
-        }
-    }
+    // ---------- liquid components (switch / slider row / buttons) ----------
 
     @Test
-    fun shell_floating_glass_light() {
+    fun settings_liquid_light() {
         if (!roborazziActive()) return
-        prepareShell(floating = true, glass = true)
+        runBlocking { container().settingsRepository.setOnboardingCompleted(true) }
         captureScreen(
-            "shell_floating_glass_light",
+            "settings_liquid_light",
             changeThreshold = GLASS_CHANGE_THRESHOLD,
-            waitText = "闹钟",
+            waitText = "液态玻璃",
         ) {
-            App(container = container(), actions = NOOP_ACTIONS)
+            CompositionLocalProvider(LocalMwGlassEnabled provides true) {
+                SettingsScreen(container = container())
+            }
         }
     }
+
+    // TODO(交接): dialog_liquid_light（玻璃对话框基线）——需要 backdrop API 在测试类路径上
+    // （androidApp testImplementation 加 io.github.kyant0:backdrop 与 compose foundation），
+    // 或经 App 壳点击「替换导入」触发 MwDialogHost 后截图。见 HANDOFF-LIQUID-GLASS.md。
 
     // ---------- helpers ----------
 
@@ -390,11 +389,10 @@ class ScreenshotTests {
      * clock. Only disabled alarms are seeded so the "下次 …" line — the one wall-clock-dependent
      * string — never appears in these baselines.
      */
-    private fun prepareShell(floating: Boolean, glass: Boolean) {
+    private fun prepareShell(glass: Boolean) {
         runBlocking {
             val settings = container().settingsRepository
             settings.setOnboardingCompleted(true)
-            settings.setFloatingBottomBarEnabled(floating)
             settings.setLiquidGlassEnabled(glass)
             container().alarmRepository.save(
                 AlarmEntity(

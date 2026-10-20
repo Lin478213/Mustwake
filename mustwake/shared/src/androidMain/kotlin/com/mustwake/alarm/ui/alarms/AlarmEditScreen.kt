@@ -34,6 +34,7 @@ import com.mustwake.alarm.ui.design.MwNumberPicker
 import com.mustwake.alarm.ui.design.MwPrimaryButton
 import com.mustwake.alarm.ui.design.MwScaffold
 import com.mustwake.alarm.ui.design.MwSectionTitle
+import com.mustwake.alarm.ui.design.MwSlider
 import com.mustwake.alarm.ui.design.MwText
 import com.mustwake.alarm.ui.design.MwTextField
 import com.mustwake.alarm.ui.design.MwTopBar
@@ -143,12 +144,11 @@ fun AlarmEditScreen(
 
             MwSectionTitle(text = "目标步数", modifier = Modifier.padding(top = 16.dp))
             MwCard(modifier = Modifier.fillMaxWidth()) {
-                MwNumberPicker(
+                MwSlider(
                     value = goalSteps,
                     onValueChange = { goalSteps = it },
                     range = 10..500,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { "$it 步" },
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                 )
             }
 

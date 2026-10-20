@@ -76,7 +76,7 @@ swept to `MISSED`; see `docs/scheduling.md`.
 
 | field | default | valid range |
 |---|---|---|
-| floatingBottomBarEnabled | false | — |
+| floatingBottomBarEnabled | false | **deprecated 2026-10-20**（并入 liquidGlassEnabled 单开关；字段保留做备份 schema v1 往返，UI 不再读取） |
 | liquidGlassEnabled | false | — |
 | defaultGoalSteps | 50 | 10–500 |
 | snoozeMinutes | 5 | 1–15 |
@@ -160,7 +160,7 @@ Kotlin support); no `kspAndroidMain` workaround was needed.
 ```bash
 cd /home/lin/Java/MustWake/mustwake
 ./gradlew :data:testDebugUnitTest     # 119 tests
-./gradlew test                        # all modules (158 tests; incl. 15 Roborazzi screenshot cases)
+./gradlew test                        # all modules (156 tests; incl. 14 Roborazzi screenshot cases)
 ./gradlew :androidApp:assembleDebug
 ```
 

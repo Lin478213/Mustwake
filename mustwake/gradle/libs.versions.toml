@@ -6,6 +6,7 @@ androidx-activity = "1.13.0"
 androidx-core = "1.19.0"
 miuix = "0.9.4"
 backdrop = "2.0.1"
+shapes = "1.2.1"
 ksp = "2.3.12"
 room = "2.8.5"
 datastore = "1.2.1"
@@ -29,6 +30,7 @@ miuix-preference = { module = "top.yukonga.miuix.kmp:miuix-preference", version.
 miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miuix" }
 miuix-nav = { module = "top.yukonga.miuix.kmp:miuix-nav", version.ref = "miuix" }
 backdrop = { module = "io.github.kyant0:backdrop", version.ref = "backdrop" }
+kyant-shapes = { module = "io.github.kyant0:shapes", version.ref = "shapes" }
 jetbrains-compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "compose" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }

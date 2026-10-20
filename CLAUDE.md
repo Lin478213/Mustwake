@@ -24,7 +24,7 @@ cd /home/lin/Java/MustWake/mustwake
 ./gradlew :androidApp:assembleDebug
 # APK: androidApp/build/outputs/apk/debug/androidApp-debug.apk
 
-# 测试（当前 158 个 JVM/Robolectric 测试）
+# 测试（当前 156 个 JVM/Robolectric 测试）
 ./gradlew test                          # 全部模块
 ./gradlew :data:testDebugUnitTest       # 仅数据层
 ./gradlew :androidApp:testDebugUnitTest # 仅 app 模块
@@ -78,7 +78,7 @@ AlarmManager.setAlarmClock
 
 ### 关键不变量（改动时必须保持）
 
-- **Miuix import 只允许出现在 `shared/.../ui/design/MwComponents.kt`**；页面只用 `Mw*` 语义组件。换 UI 实现只改适配层（选型依据：`docs/decisions.md`，不迁移 Flutter）。
+- **Miuix import 只允许出现在 `shared/.../ui/design/MwComponents.kt`**；页面只用 `Mw*` 语义组件。液态玻璃组件在 `ui/design/liquid/`（AndroidLiquidGlass 1:1 移植，只用 Compose/kyant0 库，不引 Miuix）。换 UI 实现只改适配层（选型依据：`docs/decisions.md`，不迁移 Flutter）。
 - **校验策略**：写入 `require(...)` 直接抛异常；读取 `AppSettings.sanitized()` 用默认值兜底损坏数据。
 - **Room 迁移**：`exportSchema = true`，schema JSON 提交进 `data/schemas/`；每次改表必须新增 `Migration` + 导出 schema + 对应迁移测试（现为 v2，`MIGRATION_1_2`）。无破坏性迁移。
 - **snooze 用独立 PendingIntent**（request code 带 `0x40000000` 标志），绝不覆盖重复闹钟的下次注册；会话结束时 `cancelSnooze`。

@@ -33,6 +33,7 @@ kotlin {
             implementation(libs.miuix.icons)
             implementation(libs.miuix.nav)
             implementation(libs.backdrop)
+            implementation(libs.kyant.shapes)
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

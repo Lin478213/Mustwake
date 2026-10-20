@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,16 +14,26 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.paint
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,7 +50,6 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
@@ -61,6 +71,14 @@ import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
+import com.kyant.backdrop.backdrops.emptyBackdrop
+import com.mustwake.alarm.ui.design.liquid.LiquidBottomTab
+import com.mustwake.alarm.ui.design.liquid.LiquidBottomTabs
+import com.mustwake.alarm.ui.design.liquid.LiquidButton
+import com.mustwake.alarm.ui.design.liquid.LiquidDialog
+import com.mustwake.alarm.ui.design.liquid.LiquidSlider
+import com.mustwake.alarm.ui.design.liquid.LiquidStyle
+import com.mustwake.alarm.ui.design.liquid.LiquidToggle
 
 /**
  * The only file in the app that is allowed to import Miuix directly.
@@ -121,6 +139,10 @@ fun MwThemeBackground(content: @Composable () -> Unit) {
 
 enum class MwTypo { Display, Title, Headline, Body, Label, Caption }
 
+/**
+ * Type scale aligned 1:1 with AndroidLiquidGlass (docs/ui.md § Typography & margins).
+ * Applied globally, not gated by the liquid-glass toggle.
+ */
 @Composable
 fun MwText(
     text: String,
@@ -130,14 +152,13 @@ fun MwText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Ellipsis,
 ) {
-    val styles = MiuixTheme.textStyles
     val style = when (typo) {
-        MwTypo.Display -> styles.title1
-        MwTypo.Title -> styles.title2
-        MwTypo.Headline -> styles.headline2
-        MwTypo.Body -> styles.main
-        MwTypo.Label -> styles.subtitle
-        MwTypo.Caption -> styles.footnote1
+        MwTypo.Display -> LiquidStyle.Display
+        MwTypo.Title -> LiquidStyle.DialogTitle
+        MwTypo.Headline -> LiquidStyle.BodyLarge
+        MwTypo.Body -> LiquidStyle.Body
+        MwTypo.Label -> LiquidStyle.Label
+        MwTypo.Caption -> LiquidStyle.Caption
     }
     Text(
         text = text,
@@ -221,13 +242,26 @@ fun MwPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColorsPrimary(),
-    ) {
-        MwText(text = text, typo = MwTypo.Label)
+    if (LocalMwGlassEnabled.current) {
+        val accent = if (isSystemInDarkTheme()) LiquidStyle.AccentDark else LiquidStyle.AccentLight
+        LiquidButton(
+            onClick = onClick,
+            backdrop = emptyBackdrop(),
+            modifier = modifier,
+            enabled = enabled,
+            tint = accent,
+        ) {
+            BasicText(text = text, style = LiquidStyle.Label.copy(color = Color.White))
+        }
+    } else {
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+            colors = ButtonDefaults.buttonColorsPrimary(),
+        ) {
+            MwText(text = text, typo = MwTypo.Label)
+        }
     }
 }
 
@@ -238,8 +272,20 @@ fun MwSecondaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Button(onClick = onClick, modifier = modifier, enabled = enabled) {
-        MwText(text = text, typo = MwTypo.Label)
+    if (LocalMwGlassEnabled.current) {
+        LiquidButton(
+            onClick = onClick,
+            backdrop = emptyBackdrop(),
+            modifier = modifier,
+            enabled = enabled,
+            surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.55f),
+        ) {
+            BasicText(text = text, style = LiquidStyle.Label.copy(color = MiuixTheme.colorScheme.onSurface))
+        }
+    } else {
+        Button(onClick = onClick, modifier = modifier, enabled = enabled) {
+            MwText(text = text, typo = MwTypo.Label)
+        }
     }
 }
 
@@ -269,12 +315,22 @@ fun MwSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Switch(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        modifier = modifier,
-        enabled = enabled,
-    )
+    if (LocalMwGlassEnabled.current) {
+        Box(modifier = modifier.alpha(if (enabled) 1f else 0.4f)) {
+            LiquidToggle(
+                selected = { checked },
+                onSelect = { if (enabled) onCheckedChange(it) },
+                backdrop = emptyBackdrop(),
+            )
+        }
+    } else {
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            modifier = modifier,
+            enabled = enabled,
+        )
+    }
 }
 
 @Composable
@@ -285,13 +341,35 @@ fun MwSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SwitchPreference(
-        checked = checked,
-        onCheckedChange = onCheckedChange,
-        title = title,
-        modifier = modifier,
-        summary = summary,
-    )
+    if (LocalMwGlassEnabled.current) {
+        Row(
+            modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                BasicText(text = title, style = LiquidStyle.Body.copy(color = MiuixTheme.colorScheme.onSurface))
+                if (summary != null) {
+                    BasicText(
+                        text = summary,
+                        style = LiquidStyle.Label.copy(color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.68f)),
+                    )
+                }
+            }
+            LiquidToggle(
+                selected = { checked },
+                onSelect = onCheckedChange,
+                backdrop = emptyBackdrop(),
+            )
+        }
+    } else {
+        SwitchPreference(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            title = title,
+            modifier = modifier,
+            summary = summary,
+        )
+    }
 }
 
 @Composable
@@ -354,78 +432,240 @@ fun MwFab(
 data class MwTab(val label: String, val icon: ImageVector)
 
 /**
- * Bottom navigation with two independent style axes:
- * - [floating]: centered pill instead of a full-width bar;
- * - [glassBackdrop]: liquid-glass surface (blur + tint + highlight); `null` renders solid.
- *
- * The two combinations are independent: floating solid, full-width glass, floating glass, etc.
+ * Bottom navigation with a single visual axis (liquid glass toggle):
+ * - glass on  → 1:1 `LiquidBottomTabs` (floating capsule, drag thumb, refraction);
+ * - glass off → full-width Miuix `NavigationBar`.
  */
 @Composable
 fun MwBottomBar(
     tabs: List<MwTab>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
-    floating: Boolean,
     glassBackdrop: Backdrop?,
     modifier: Modifier = Modifier,
 ) {
-    if (floating) {
+    if (glassBackdrop != null) {
+        val contentColor = if (isSystemInDarkTheme()) Color.White else Color.Black
         Box(
-            modifier = modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center,
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = LiquidStyle.BarSideMargin, vertical = 8.dp),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (glassBackdrop != null) {
-                            Modifier.mwGlass(glassBackdrop, RoundedCornerShape(28.dp))
-                        } else {
-                            Modifier.background(
-                                color = MiuixTheme.colorScheme.surfaceContainer,
-                                shape = RoundedCornerShape(28.dp),
-                            )
-                        },
-                    )
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            LiquidBottomTabs(
+                selectedTabIndex = { selectedIndex },
+                onTabSelected = onSelect,
+                backdrop = glassBackdrop,
+                tabsCount = tabs.size,
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 tabs.forEachIndexed { index, tab ->
-                    FloatingNavigationBarItem(
-                        selected = index == selectedIndex,
-                        onClick = { onSelect(index) },
-                        icon = tab.icon,
-                        label = tab.label,
-                        modifier = Modifier.weight(1f),
-                    )
+                    LiquidBottomTab(onClick = { onSelect(index) }) {
+                        Box(
+                            Modifier
+                                .size(LiquidStyle.TabIconSize)
+                                .paint(
+                                    rememberVectorPainter(tab.icon),
+                                    colorFilter = ColorFilter.tint(contentColor),
+                                )
+                        )
+                        BasicText(
+                            tab.label,
+                            style = LiquidStyle.Caption.copy(color = contentColor),
+                        )
+                    }
                 }
             }
         }
         return
     }
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        if (glassBackdrop != null) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .mwGlass(
-                        backdrop = glassBackdrop,
-                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    ),
+    NavigationBar {
+        tabs.forEachIndexed { index, tab ->
+            NavigationBarItem(
+                selected = index == selectedIndex,
+                onClick = { onSelect(index) },
+                icon = tab.icon,
+                label = tab.label,
             )
         }
-        NavigationBar(
-            color = if (glassBackdrop != null) Color.Transparent else MiuixTheme.colorScheme.surface,
+    }
+}
+
+/**
+ * Slider-shaped control: `LiquidSlider` when liquid glass is on, `MwNumberPicker` otherwise.
+ * Used for goal-steps values (1:1 slider skin from the reference project).
+ */
+@Composable
+fun MwSlider(
+    value: Int,
+    onValueChange: (Int) -> Unit,
+    range: IntRange,
+    modifier: Modifier = Modifier,
+) {
+    if (LocalMwGlassEnabled.current) {
+        LiquidSlider(
+            value = { value.toFloat() },
+            onValueChange = { onValueChange(it.toInt()) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            visibilityThreshold = 1f,
+            backdrop = emptyBackdrop(),
+            modifier = modifier,
+        )
+    } else {
+        MwNumberPicker(value = value, onValueChange = onValueChange, range = range, modifier = modifier)
+    }
+}
+
+/**
+ * Titled slider row: `LiquidSlider` under liquid glass, `+/-` stepper otherwise.
+ * Stepper layout matches the settings rows so non-glass users see no change.
+ */
+@Composable
+fun MwSliderRow(
+    title: String,
+    value: Int,
+    range: IntRange,
+    step: Int,
+    suffix: String,
+    modifier: Modifier = Modifier,
+    onChange: (Int) -> Unit,
+) {
+    if (LocalMwGlassEnabled.current) {
+        Column(modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Row {
+                MwText(text = title, typo = MwTypo.Body, modifier = Modifier.weight(1f))
+                MwText(text = "$value $suffix", typo = MwTypo.Caption)
+            }
+            LiquidSlider(
+                value = { value.toFloat() },
+                onValueChange = { raw ->
+                    val snapped = (raw / step).toInt().let { base ->
+                        val candidates = listOf(base * step, (base + 1) * step)
+                        candidates.minByOrNull { kotlin.math.abs(it - raw) } ?: raw.toInt()
+                    }.coerceIn(range)
+                    onChange(snapped)
+                },
+                valueRange = range.first.toFloat()..range.last.toFloat(),
+                visibilityThreshold = step.toFloat(),
+                backdrop = emptyBackdrop(),
+            )
+        }
+    } else {
+        Row(
+            modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            tabs.forEachIndexed { index, tab ->
-                NavigationBarItem(
-                    selected = index == selectedIndex,
-                    onClick = { onSelect(index) },
-                    icon = tab.icon,
-                    label = tab.label,
-                )
+            Column(modifier = Modifier.weight(1f)) {
+                MwText(text = title, typo = MwTypo.Body)
+                MwText(text = "$value $suffix", typo = MwTypo.Caption)
+            }
+            MwSecondaryButton(
+                text = "−",
+                modifier = Modifier.width(56.dp),
+                enabled = value > range.first,
+                onClick = { onChange((value - step).coerceAtLeast(range.first)) },
+            )
+            MwSecondaryButton(
+                text = "+",
+                modifier = Modifier.width(56.dp),
+                enabled = value < range.last,
+                onClick = { onChange((value + step).coerceAtMost(range.last)) },
+            )
+        }
+    }
+}
+
+data class MwDialogSpec(
+    val title: String,
+    val text: String,
+    val confirmText: String,
+    val onConfirm: () -> Unit,
+    val dismissText: String,
+    val onDismiss: () -> Unit,
+)
+
+class MwDialogState {
+    var spec: MwDialogSpec? by mutableStateOf(null)
+}
+
+val LocalMwDialogState = staticCompositionLocalOf { MwDialogState() }
+
+/**
+ * Dialog overlay hosted by [com.mustwake.alarm.App] OUTSIDE the captured screen layer so the
+ * glass panel can refract the content beneath it without self-capture.
+ */
+@Composable
+fun MwDialogHost(glassBackdrop: Backdrop?, state: MwDialogState) {
+    val spec = state.spec ?: return
+    if (glassBackdrop != null) {
+        LiquidDialog(
+            title = spec.title,
+            text = spec.text,
+            confirmText = spec.confirmText,
+            onConfirm = {
+                state.spec = null
+                spec.onConfirm()
+            },
+            dismissText = spec.dismissText,
+            onDismiss = {
+                state.spec = null
+                spec.onDismiss()
+            },
+            onDismissRequest = {
+                state.spec = null
+                spec.onDismiss()
+            },
+            backdrop = glassBackdrop,
+        )
+    } else {
+        MwSolidDialog(
+            spec = spec,
+            onConfirm = {
+                state.spec = null
+                spec.onConfirm()
+            },
+            onDismiss = {
+                state.spec = null
+                spec.onDismiss()
+            },
+        )
+    }
+}
+
+@Composable
+private fun MwSolidDialog(
+    spec: MwDialogSpec,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.3f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            modifier = Modifier
+                .padding(horizontal = LiquidStyle.DialogMargin)
+                .fillMaxWidth(),
+        ) {
+            MwText(text = spec.title, typo = MwTypo.Title, modifier = Modifier.padding(24.dp, 20.dp, 24.dp, 8.dp))
+            MwText(
+                text = spec.text,
+                typo = MwTypo.Label,
+                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                modifier = Modifier.padding(horizontal = 24.dp),
+                maxLines = 5,
+            )
+            Row(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                MwSecondaryButton(text = spec.dismissText, onClick = onDismiss, modifier = Modifier.weight(1f))
+                MwPrimaryButton(text = spec.confirmText, onClick = onConfirm, modifier = Modifier.weight(1f))
             }
         }
     }

@@ -1,16 +1,19 @@
 # Toolchain (T0)
 
-Installed on 2026-10-19, entirely inside `E:\MustWake\toolchain` (no system-wide install).
+Installed on 2026-10-19, entirely inside `/home/lin/Java/MustWake/toolchain` (no system-wide install).
+Migrated to Linux x86_64 on 2026-10-20 (same versions; Windows binaries replaced by Linux ones).
 
 ## Versions
 
 | Component | Version | Path |
 |---|---|---|
-| Gradle | 9.8.1 | `E:\MustWake\toolchain\gradle-9.8.1` |
-| JDK | Temurin 21.0.12.1+1 (LTS) | `E:\MustWake\toolchain\jdk-21` |
-| Android SDK platform | android-37.0 | `E:\MustWake\toolchain\android-sdk\platforms\android-37.0` |
-| Android build-tools | 37.0.0 | `E:\MustWake\toolchain\android-sdk\build-tools\37.0.0` |
-| Android platform-tools | 37.0.1 | `E:\MustWake\toolchain\android-sdk\platform-tools` |
+| Gradle | 9.8.1 | `/home/lin/Java/MustWake/toolchain/gradle-9.8.1` |
+| JDK | Temurin 21.0.12.1+1 (LTS) | `/home/lin/Java/MustWake/toolchain/jdk-21` |
+| Android SDK platform | android-37.0 | `/home/lin/Java/MustWake/toolchain/android-sdk/platforms/android-37.0` |
+| Android build-tools | 37.0.0 | `/home/lin/Java/MustWake/toolchain/android-sdk/build-tools/37.0.0` |
+| Android platform-tools | 37.0.1 | `/home/lin/Java/MustWake/toolchain/android-sdk/platform-tools` |
+| Android emulator | 37.2.12 (linux-x64) | `/home/lin/Java/MustWake/toolchain/android-sdk/emulator` |
+| Android cmdline-tools | 23.0 | `/home/lin/Java/MustWake/toolchain/android-sdk/cmdline-tools/latest` |
 
 Project dependency versions are pinned in `gradle/libs.versions.toml`:
 
@@ -63,9 +66,8 @@ in `docs/decisions.md`. No Flutter SDK is installed or required.
 Room schema is at version 2. Details: `docs/data-layer.md`, `docs/scheduling.md`,
 `docs/ringing.md`, `docs/steps.md`, `docs/ui.md`, `docs/appearance.md`, `docs/permissions.md`.
 
-Emulator (all files on E:) is installed under
-`toolchain/android-home/avd/mustwake36`; setup and the T8 pre-check results are in
-`docs/testing.md`.
+The emulator is installed under `toolchain/android-home/avd/mustwake36`; setup and the T8
+pre-check results are in `docs/testing.md`.
 
 `:data` uses `com.android.library` + KSP. AGP 9's built-in Kotlin support compiles Kotlin
 without the `org.jetbrains.kotlin.android` plugin, and `ksp(...)` works as usual; no
@@ -76,22 +78,46 @@ without the `org.jetbrains.kotlin.android` plugin, and `ksp(...)` works as usual
 `gradle.properties` pins:
 
 ```
-org.gradle.java.home=E:/MustWake/toolchain/jdk-21
+org.gradle.java.home=/home/lin/Java/MustWake/toolchain/jdk-21
 ```
 
 `local.properties` pins:
 
 ```
-sdk.dir=E:/MustWake/toolchain/android-sdk
+sdk.dir=/home/lin/Java/MustWake/toolchain/android-sdk
 ```
 
 `gradle/wrapper/gradle-wrapper.properties` points at the local Gradle zip:
 
 ```
-distributionUrl=file\:///E:/MustWake/toolchain/downloads/gradle-9.8.1-bin.zip
+distributionUrl=file\:///home/lin/Java/MustWake/toolchain/downloads/gradle-9.8.1-bin.zip
 ```
 
 The build was re-run with `JAVA_HOME`/`ANDROID_HOME` unset and still succeeded (`BUILD SUCCESSFUL in 2s`, all tasks up-to-date), proving the project is self-contained.
+
+## Linux migration (2026-10-20)
+
+The workspace moved from Windows (`E:\MustWake`, WHPX) to Linux x86_64 (`/home/lin/Java/MustWake`, KVM).
+Versions are unchanged; only the binaries and absolute paths changed:
+
+- Replaced the Windows JDK with Temurin `21.0.12.1+1` for `linux/x64` (same build as before).
+- Replaced `cmdline-tools` with 23.0 (linux), then installed `platform-tools` 37.0.1,
+  `build-tools;37.0.0` and `emulator` 37.2.12 from `sdkmanager`.
+- Kept the platform-independent parts: `platforms/android-37.0` and
+  `system-images/android-36/google_apis/x86_64`.
+- Updated `gradle.properties`, `local.properties`, `gradle-wrapper.properties` and the AVD
+  `mustwake36.ini` to Linux paths.
+
+Verification on the migrated toolchain:
+
+```
+./gradlew :androidApp:assembleDebug   -> BUILD SUCCESSFUL in 1m 53s
+./gradlew test --rerun-tasks          -> BUILD SUCCESSFUL in 32s, 158 tests / 0 failures
+emulator -avd mustwake36 (headless)   -> sys.boot_completed=1 after ~30 s, API 36, KVM
+```
+
+The Gradle wrapper launcher itself still uses the `java` on `PATH` (the daemon uses the pinned
+`toolchain/jdk-21`); a system JDK 21 must therefore be visible when invoking `./gradlew`.
 
 ## Known warnings
 

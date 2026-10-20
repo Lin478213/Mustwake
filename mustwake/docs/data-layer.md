@@ -157,11 +157,11 @@ Kotlin support); no `kspAndroidMain` workaround was needed.
 
 ## Verification
 
-```powershell
-cd E:\MustWake\mustwake
-.\gradlew.bat :data:testDebugUnitTest     # 119 tests
-.\gradlew.bat test                        # all modules (158 tests; incl. 15 Roborazzi screenshot cases)
-.\gradlew.bat :androidApp:assembleDebug
+```bash
+cd /home/lin/Java/MustWake/mustwake
+./gradlew :data:testDebugUnitTest     # 119 tests
+./gradlew test                        # all modules (158 tests; incl. 15 Roborazzi screenshot cases)
+./gradlew :androidApp:assembleDebug
 ```
 
 - 119 JVM tests in `:data`: settings defaults/validation, repository validation and timestamps,

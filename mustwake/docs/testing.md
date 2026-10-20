@@ -2,30 +2,33 @@
 
 Date: 2026-10-19/20. Emulator is a **pre-check**, not the HyperOS acceptance in T8.
 
-## Environment (all on E:)
+## Environment (Linux)
+
+The original run (2026-10-19/20) was on Windows with WHPX. The toolchain was migrated to Linux
+x86_64 on 2026-10-20; the same AVD is reused with KVM acceleration.
 
 | item | value |
 |---|---|
-| SDK | `E:\MustWake\toolchain\android-sdk` |
-| emulator | 37.2.12 (manual zip install) |
+| SDK | `/home/lin/Java/MustWake/toolchain/android-sdk` |
+| emulator | 37.2.12 (linux-x64) |
 | image | `system-images;android-36;google_apis;x86_64` (rev 7) |
-| AVD | `E:\MustWake\toolchain\android-home\avd\mustwake36` (manual config, E: only) |
-| user home | `ANDROID_USER_HOME=E:\MustWake\toolchain\android-home` |
-| accel | WHPX usable |
+| AVD | `/home/lin/Java/MustWake/toolchain/android-home/avd/mustwake36` |
+| user home | `ANDROID_USER_HOME=/home/lin/Java/MustWake/toolchain/android-home` |
+| accel | KVM (`/dev/kvm` present) |
 | device | 1080×2400, 420 dpi, API 36 |
 
 Start:
 
-```powershell
-$env:ANDROID_USER_HOME="E:\MustWake\toolchain\android-home"
-$env:ANDROID_AVD_HOME="E:\MustWake\toolchain\android-home\avd"
-E:\MustWake\toolchain\android-sdk\emulator\emulator.exe -avd mustwake36 `
+```bash
+export ANDROID_USER_HOME=/home/lin/Java/MustWake/toolchain/android-home
+export ANDROID_AVD_HOME=/home/lin/Java/MustWake/toolchain/android-home/avd
+/home/lin/Java/MustWake/toolchain/android-sdk/emulator/emulator -avd mustwake36 \
   -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot
 ```
 
-`sdkmanager` stalled at ~0.5 MB/s during install, so the emulator and image zips were downloaded
-with curl (60+ MB/s) and unpacked into the SDK. `avdmanager` refused to create the AVD without
-`package.xml`, so the AVD was created manually with the same `config.ini` fields.
+On the original Windows setup, `sdkmanager` stalled at ~0.5 MB/s, so the emulator and image zips
+were downloaded with curl and unpacked into the SDK; `avdmanager` refused to create the AVD
+without `package.xml`, so the AVD was created manually with the same `config.ini` fields.
 
 ## Results
 

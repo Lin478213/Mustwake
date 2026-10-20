@@ -31,24 +31,24 @@ Android step-gated alarm clock. The alarm rings until the step target is reached
 
 ## Build
 
-```powershell
-cd E:\MustWake\mustwake
-.\gradlew.bat :androidApp:assembleDebug
+```bash
+cd /home/lin/Java/MustWake/mustwake
+./gradlew :androidApp:assembleDebug
 ```
 
-APK: `androidApp\build\outputs\apk\debug\androidApp-debug.apk`
+APK: `androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ## Test
 
-```powershell
-.\gradlew.bat test                 # all JVM unit tests (122 tests)
-.\gradlew.bat :data:testDebugUnitTest
-.\gradlew.bat :androidApp:testDebugUnitTest
+```bash
+./gradlew test                 # all JVM unit tests (158 tests)
+./gradlew :data:testDebugUnitTest
+./gradlew :androidApp:testDebugUnitTest
 ```
 
-The first Robolectric run downloads its Android runtime (~5 min on this network).
+The first Robolectric run downloads its Android runtime.
 
-The project is self-contained under `E:\MustWake\toolchain`; see `docs/toolchain.md` for versions and paths.
+The project is self-contained under `/home/lin/Java/MustWake/toolchain`; see `docs/toolchain.md` for versions and paths.
 
 ## Spec and plan
 
@@ -57,6 +57,6 @@ The project is self-contained under `E:\MustWake\toolchain`; see `docs/toolchain
 
 ## Install (requires a connected device)
 
-```powershell
-adb install -r androidApp\build\outputs\apk\debug\androidApp-debug.apk
+```bash
+/home/lin/Java/MustWake/toolchain/android-sdk/platform-tools/adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk
 ```

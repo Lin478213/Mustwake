@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库布局
 
-Git 根是 `E:\MustWake`，真正的工程在 `mustwake/` 子目录（Gradle 多模块 Android 项目）：
+Git 根是 `/home/lin/Java/MustWake`（原 Windows 路径 `E:\MustWake`），真正的工程在 `mustwake/` 子目录（Gradle 多模块 Android 项目）：
 
 - `mustwake/` — MustWake：步数解锁闹钟 App（到点响铃，走到目标步数才能停止，Miuix UI）
 - `mustwake/docs/` — 各任务的权威实现文档（见下方"文档导航"）
@@ -15,38 +15,39 @@ Git 根是 `E:\MustWake`，真正的工程在 `mustwake/` 子目录（Gradle 多
 
 ## 常用命令
 
-在 `mustwake/` 目录下执行（PowerShell）。构建完全自包含，不需要设置 JAVA_HOME/ANDROID_HOME：
+在 `mustwake/` 目录下执行（Linux bash；2026-10-20 起工具链为 Linux 版，旧的 `E:\MustWake` Windows 路径已不适用）。构建完全自包含，不需要设置 JAVA_HOME/ANDROID_HOME：
 
-```powershell
-cd E:\MustWake\mustwake
+```bash
+cd /home/lin/Java/MustWake/mustwake
 
 # 构建
-.\gradlew.bat :androidApp:assembleDebug
-# APK: androidApp\build\outputs\apk\debug\androidApp-debug.apk
+./gradlew :androidApp:assembleDebug
+# APK: androidApp/build/outputs/apk/debug/androidApp-debug.apk
 
 # 测试（当前 158 个 JVM/Robolectric 测试）
-.\gradlew.bat test                          # 全部模块
-.\gradlew.bat :data:testDebugUnitTest       # 仅数据层
-.\gradlew.bat :androidApp:testDebugUnitTest # 仅 app 模块
+./gradlew test                          # 全部模块
+./gradlew :data:testDebugUnitTest       # 仅数据层
+./gradlew :androidApp:testDebugUnitTest # 仅 app 模块
 
 # 截图基线（androidApp/src/test/screenshots/）
-.\gradlew.bat :androidApp:recordRoborazziDebug   # 重新录制基线
-.\gradlew.bat :androidApp:verifyRoborazziDebug   # 对比基线（UI 改动后跑）
+./gradlew :androidApp:recordRoborazziDebug   # 重新录制基线
+./gradlew :androidApp:verifyRoborazziDebug   # 对比基线（UI 改动后跑）
 
 # 跑单个测试类
-.\gradlew.bat :data:testDebugUnitTest --tests "*StopPolicyTest*"
+./gradlew :data:testDebugUnitTest --tests "*StopPolicyTest*"
 
 # 安装到已连接设备
-adb install -r androidApp\build\outputs\apk\debug\androidApp-debug.apk
+/home/lin/Java/MustWake/toolchain/android-sdk/platform-tools/adb install -r androidApp/build/outputs/apk/debug/androidApp-debug.apk
 ```
 
-模拟器启动与验收命令见 `mustwake/docs/testing.md`（AVD 在 `toolchain/android-home/avd/mustwake36`，需设 `ANDROID_USER_HOME`/`ANDROID_AVD_HOME`）。
+模拟器启动与验收命令见 `mustwake/docs/testing.md`（AVD 在 `toolchain/android-home/avd/mustwake36`，需设 `ANDROID_USER_HOME`/`ANDROID_AVD_HOME`；使用 KVM 加速）。
 
 注意事项：
 
 - 首次 Robolectric 运行会下载 android-all（本网络约 5 分钟），之后很快。
 - Robolectric 只有 SDK 34 运行时，DAO 测试固定跑 SDK 34；行为是 SQL 层的，与版本无关。
 - `settings.gradle.kts` 把 Aliyun 镜像放在 Google/Maven Central 之前（本网络直连很慢）；镜像不可用时可移除或调序。
+- 工具链（JDK 21 / Android SDK 37 / Gradle 9.8.1 / AVD）全部在 `toolchain/`，Linux x86_64 版；`gradle.properties`、`gradle-wrapper.properties`、`local.properties` 中的绝对路径均指向 `/home/lin/Java/MustWake/toolchain`。
 
 ## 架构
 
@@ -59,7 +60,7 @@ adb install -r androidApp\build\outputs\apk\debug\androidApp-debug.apk
 :shared (androidMain) ──→ :data
 ```
 
-- **`:data`** — `AppContainer`（手动 DI，无 Hilt）、`AlarmRepository`/`HistoryRepository`/`SessionRepository`/`SettingsRepository`、Room（`mustwake.db` v2：`alarms`、`alarm_events`、`alarm_sessions`）、DataStore 设置。纯逻辑也放这里以便 JVM 测试：`StopPolicy`、`StepBaselineTracker`、`ShakeCounter`、`NextTriggerCalculator`。**数据层放 `:data`，不要塞进 KMP `shared`**（KSP 在 KMP 模块里需要额外接线）。
+- **`:data`** — `AppContainer`（手动 DI，无 Hilt）、`AlarmRepository`/`HistoryRepository`/`SessionRepository`/`SettingsRepository`/`BackupRepository`（`backup/`，JSON 导出/导入，kotlinx.serialization）、Room（`mustwake.db` v2：`alarms`、`alarm_events`、`alarm_sessions`）、DataStore 设置。纯逻辑也放这里以便 JVM 测试：`StopPolicy`、`StepBaselineTracker`、`ShakeCounter`、`NextTriggerCalculator`。**数据层放 `:data`，不要塞进 KMP `shared`**（KSP 在 KMP 模块里需要额外接线）。
 - **`:shared`** — UI 屏幕（列表/编辑/历史/设置/响铃/权限引导）+ `App.kt` 导航壳（简单 `AppTab` 状态，无导航库）。UI 直接读仓库，调度通过 `AlarmUiActions` 回调由 `:androidApp` 实现。
 - **`:androidApp`** — `AlarmScheduler`（`setAlarmClock` + 不精确回退）、`AlarmReceiver`/`BootReceiver`、`AlarmService`（前台服务）、`StepSensorRepository`/`ShakeDetector`、`AlarmNotifications`、`MainActivity`/`RingingActivity`/`MustWakeApp`。
 
@@ -114,3 +115,5 @@ AlarmManager.setAlarmClock
 - `mustwake/docs/testing.md` — 模拟器 14 项预检结果与设备缺口
 - `mustwake/docs/decisions.md` — 技术选型记录（UI 为何不用 Flutter）
 - `HANDOFF.md` / `HANDOFF-PHASE2.md` / `HANDOFF-PHASE2-PLAN.md` — 交接、Phase 2 范围与优先级
+- `HANDOFF-M1A.md` — **当前执行状态**（M1-A1 备份/恢复、M1-A2 截图基线已完成，M1-A3 Baseline Profile 待做；含未推送提交 `9cce785` 与评审闭环约定）
+- `.omc/plans/phase2-execution.md` / `.omc/plans/phase2.md` / `.omc/specs/deep-interview-phase2.md` — Phase 2 分步计划与 spec（M1-A/B、G0 真机门禁）

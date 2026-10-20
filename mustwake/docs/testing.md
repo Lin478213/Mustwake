@@ -68,3 +68,50 @@ Re-tested: hold at 0 shakes → ignored; shake 30 → hold again → `DEGRADED` 
   after first grant, force-stop restrictions.
 - Boot sweep only received `BOOT_COMPLETED` after unlocking, which matches Android's
   credential-protected storage rules.
+
+## M1-A3 Baseline Profile (emulator pre-check)
+
+Date: 2026-10-20. **Emulator numbers are a pre-check only; G0 real-device runs are the
+acceptance gate.** Method and tables are recorded so the G0 run can be compared against
+the same setup.
+
+### Method
+
+| item | value |
+|---|---|
+| device | emulator mustwake36 (API 36, 1080×2400, 4 cores, KVM); benchmark output prints `WARNING: Running on Emulator` |
+| metric | `StartupTimingMetric` → `timeToInitialDisplayMs`, `StartupMode.COLD` |
+| iterations | 5 per test (each cell below is n=5) |
+| before | `CompilationMode.None()` (no profile) |
+| after | `CompilationMode.Partial(baselineProfileMode = BaselineProfileMode.Require)` — fails if the baseline profile is not installed |
+| profile collectors | `MainActivityBaselineProfile` / `RingingActivityBaselineProfile` (cold start), maxIterations=5, stableIterations=3 |
+| commands | `./gradlew :androidApp:generateBaselineProfile -PbenchmarkAllowEmulator=true` then `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest -PbenchmarkAllowEmulator=true` |
+| percentiles | P50/P90 computed from the 5 `runs` values in `benchmarkData.json` (linear interpolation). With n=5 the P90 sits close to the max — indicative, not a tail estimate |
+| raw data | `baselineprofile/build/outputs/connected_android_test_additional_output/benchmarkRelease/connected/.../com.mustwake.alarm.baselineprofile-benchmarkData.json` (build output, gitignored) |
+
+### Results (timeToInitialDisplayMs, ms)
+
+| scenario | before P50 | before P90 | after P50 | after P90 | ΔP50 |
+|---|---|---|---|---|---|
+| MainActivity cold start | 348.8 | 393.4 | 344.5 | 385.0 | −1.2% |
+| RingingActivity cold start | 664.4 | 694.0 | 625.8 | 668.5 | −5.8% |
+
+Main cold start is flat within noise (per-run CV ≈ 9–12%); Ringing improves modestly and is
+the slower path (turnScreenOn/showWhenLocked flags). Both `Require` tests passed, so the
+profile was actually installed and applied for the "after" column — this is not a null
+comparison. **All values are emulator pre-check; only G0 real-device numbers count.**
+RingingActivity is `exported=false` with `turnScreenOn`/`showWhenLocked`; if those flags
+distort real-device startup, recalibrate the scenario after G0.
+
+`RingingActivity` is started from instrumentation with an explicit `setClassName`
+component and no extras (renders the default ringing state). No app manifest change was
+needed — no Permission Denial on API 36.
+
+### Profile artifact
+
+`androidApp/src/release/generated/baselineProfiles/baseline-prof.txt` — 13,742 rules
+(one per line), merged from both collectors (53 rules reference the Ringing journey,
+12 the Main/list journey). Produced by `:androidApp:generateBaselineProfile` and kept in
+the repo as the real-scenario profile (spike empty-scenario profiles were not committed).
+`generateBaselineProfile` warns that no `includeInStartupProfile=true` rules were generated;
+startup profiles are out of scope, only baseline profiles are shipped.

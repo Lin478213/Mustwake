@@ -104,7 +104,7 @@ M1-A(1..5) ──→ G0(真机) ──→ M1-B(1..5, M1 关闭) ──→ M2 ─
 5. **生成并落盘**：跑生成 profile 的任务（spike 实测为 `:androidApp:generateBaselineProfile`，模拟器跑加 `-PbenchmarkAllowEmulator=true`）→ 产物自动生成到 `androidApp/src/release/generated/baselineProfiles/baseline-prof.txt` 并被插件自动挂进 release 源集（**偏离原文 `src/main/baselineProfiles/`**：baselineprofile 1.5.0 + AGP 9 的实际产物路径，无需手动拷贝，此目录随最终 profile 一并提交；**提交策略**：只提交真实场景 profile 正本，spike 空场景 profile 不进仓库）；在 `docs/testing.md` 记录 before/after P50/P90。Ringing 基准若被 FSI/turnScreenOn 标志干扰（真机差异），G0 后校准。
 
 **验收（可测）**：
-- `.\gradlew.bat :androidApp:assembleDebug` 产物含 profile（`aapt2 dump` 或 benchmark 报告佐证）。
+- 产物含 profile 的佐证（二选一）：release 系变体（nonMinifiedRelease/benchmarkRelease）编出 `intermediates/binary_art_profile/**/baseline.prof`（`aapt2 dump` 可查）；或 `CompilationMode.Partial(Require)` 基准全过（profile 未安装会直接 fail）。**（2026-10-20 实测措辞修正**：profile 挂 release 源集（步骤 5），debug APK 不含 profile，故 `assembleDebug` 只作构建冒烟，不作 profile 验收载体。**）**
 - `./gradlew :baselineprofile:connectedBenchmarkReleaseAndroidTest -PbenchmarkAllowEmulator=true`（模拟器 mustwake36 可跑，启动命令见 `docs/testing.md`；任务名以 spike 实测为准，真机不带 `-PbenchmarkAllowEmulator`）出报告，P50/P90 记入文档；Ringing 冷启动 P50 有 before/after 对比。
 - 无设备/模拟器时任务标记为"待 G0"，不阻塞其余 M1-A。
 

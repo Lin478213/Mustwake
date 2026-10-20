@@ -1,5 +1,6 @@
 package com.mustwake.alarm.baselineprofile
 
+import androidx.benchmark.macro.BaselineProfileMode
 import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
@@ -10,24 +11,28 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * M1-A3 spike: minimal empty-scenario macrobenchmark, only to prove the
- * `:baselineprofile` + `androidx.benchmark.macro` pipeline works with AGP 9.3.2.
- * Real scenarios (MainActivityStartupBenchmark / RingingActivityStartupBenchmark)
- * come in a later step.
+ * M1-A3: cold-start timing of MainActivity, before (no profile) and after
+ * (baseline profile required) — the before/after pair for the emulator pre-check.
  */
 @RunWith(AndroidJUnit4::class)
-class EmptyStartupBenchmark {
+class MainActivityStartupBenchmark {
 
     @get:Rule val benchmarkRule = MacrobenchmarkRule()
 
     @Test
-    fun coldStart() =
+    fun coldStartWithoutProfile() = measureColdStart(CompilationMode.None())
+
+    @Test
+    fun coldStartWithBaselineProfile() =
+        measureColdStart(CompilationMode.Partial(baselineProfileMode = BaselineProfileMode.Require))
+
+    private fun measureColdStart(compilationMode: CompilationMode) =
         benchmarkRule.measureRepeated(
             packageName = TARGET_PACKAGE,
             metrics = listOf(StartupTimingMetric()),
-            compilationMode = CompilationMode.DEFAULT,
+            compilationMode = compilationMode,
             startupMode = StartupMode.COLD,
-            iterations = 1,
+            iterations = 5,
         ) {
             pressHome()
             startActivityAndWait()

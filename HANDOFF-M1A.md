@@ -1,6 +1,6 @@
 # HANDOFF — Phase 2 M1-A 执行进展交接
 
-> 交接时间：2026-10-19；2026-10-20 更新（M1-A3 spike 完成）。
+> 交接时间：2026-10-19；2026-10-20 更新（M1-A3 完成）。
 > 计划与硬约束见 `HANDOFF-PHASE2-PLAN.md`、`.omc/plans/phase2-execution.md`、`CLAUDE.md`；本文只记录**执行状态与接手要点**，不重复它们的内容。
 
 ## 状态总览
@@ -9,7 +9,7 @@
 |---|---|---|---|
 | M1-A1 备份/恢复 JSON | ✅ 完成（代码评审 APPROVE） | `2456352` + `cd5466d` | 已推送 |
 | M1-A2 Roborazzi 截图基线 | ✅ 完成（代码评审 APPROVE） | `9cce785` | 已推送 |
-| M1-A3 Baseline Profile | 🔄 spike 完成（评审 APPROVE），真实场景步骤 2-5 待做 | `build(baselineprofile)` spike 提交 | 未推送 |
+| M1-A3 Baseline Profile | ✅ 完成（spike + 真实场景；模拟器预检通过，G0 真机数字仍为准） | `build(baselineprofile)` spike + `perf(startup)` | 未推送 |
 | M1-A4 a11y + 字符串 | ⬜ 未开始 | — | — |
 | M1-A5 崩溃/ANR 可观测性 | ⬜ 未开始 | — | — |
 | G0 真机门禁 | ⬜ 未开始 | — | — |
@@ -69,7 +69,7 @@
 
 ## 遗留事项（按优先序）
 
-1. **推送 M1-A3 spike 提交到 GitHub**（`9cce785` 及之前的提交已在 origin；推送授权按会话确认）。
+1. **本地待推送提交**（`9cce785` 及之前已在 origin）：M1-A3 spike、EOL chore、`perf(startup)` 三个提交。推送需交互凭据——本环境 `ksshaskpass` 取不到密码，`git push` 会失败；请用户用 `! git push origin master` 自行执行（推送授权已确认「每任务提交后立即推」，失败时改人工）。
 2. **M1-A4 前置小项**（M1-A2 评审 LOW，非阻断）：
    - `ScreenshotTests.kt:81` `createComposeRule` 已弃用 → 迁 `androidx.compose.ui.test.junit4.v2.createComposeRule`。注意 v2 是排队调度语义，迁移后确认 `waitUntil` 同步点仍充分，并重跑 verifyRoborazziDebug ×2。
    - 可选：`org.jetbrains.compose.ui:ui-test-junit4` 换 `androidx.compose.ui:ui-test-junit4`（`androidApp` 是纯 Android 模块，依赖图更直接）。
@@ -79,15 +79,12 @@
 
 ---
 
-## 下一步：M1-A3 步骤 2-5（真实场景）
+## 下一步：M1-A4 a11y + 字符串（M1-A3 已完结）
 
-spike（步骤 1）已完成并独立提交——`:baselineprofile`（`com.android.test` → `:androidApp`）+ `androidx.benchmark.macro` 1.5.0 × AGP 9.3.2 内置 Kotlin + KMP `:shared` 兼容性成立，空场景全链路实测通过（评测任务 `:baselineprofile:connectedBenchmarkReleaseAndroidTest`、生成任务 `:androidApp:generateBaselineProfile`、变体分工与兼容区间等实测结论见 `.omc/plans/phase2-execution.md` M1-A3 步骤 1）。剩余步骤（同文件 L100-108）：
+M1-A3 全部完成（spike + 真实场景均独立提交）：Main/Ringing 冷启动基准 before/after 已出数（模拟器预检 P50：Main 348.8→344.5ms −1.2%，Ringing 664.4→625.8ms −5.8%；G0 真机才作数），真实 profile（13,742 规则）已落 `androidApp/src/release/generated/baselineProfiles/baseline-prof.txt` 随提交入库，方法与数据见 `mustwake/docs/testing.md` § M1-A3。实测结论与验收措辞修正见 `.omc/plans/phase2-execution.md` M1-A3。
 
-- 场景类：`MainActivityStartupBenchmark`、`RingingActivityStartupBenchmark`（`StartupTimingMetric`，cold start，各 ≥3 次迭代），替换 `EmptyStartupBenchmark`；`EmptyBaselineProfile` 换真实采集旅程。
-- **生成并落盘**：`./gradlew :androidApp:generateBaselineProfile -PbenchmarkAllowEmulator=true` → 产物自动落 `androidApp/src/release/generated/baselineProfiles/baseline-prof.txt`（插件自动挂进 release 源集，随最终 profile 提交；spike 实测路径，非原计划的 `src/main/`）。
-- **模拟器跑必须加 `-PbenchmarkAllowEmulator=true`**（spike 评审 Minor-1 门禁：默认严格，防 G0 静默收模拟器/低电量数字）；真机/G0 不带。
-- 模拟器 mustwake36（启动命令见 `mustwake/docs/testing.md`，需 `ANDROID_USER_HOME`/`ANDROID_AVD_HOME`）；无设备时标「待 G0」不阻塞。
-- before/after P50/P90 记入 `mustwake/docs/testing.md`；Ringing 基准若被 FSI/turnScreenOn 干扰，G0 后校准。
+- **M1-A4**（a11y + 字符串基础设施）：步骤见 `.omc/plans/phase2-execution.md` M1-A4 节（94 处/9 文件硬编码中文迁 `shared/src/androidMain/res/values/strings.xml`）。
+- **G0 真机**（M1-A4 后或并行）：真机重跑 M1-A3 同场景取正式数字（命令同 `docs/testing.md`，**不带** `-PbenchmarkAllowEmulator`）；Ringing 若被 FSI/turnScreenOn 干扰则校准场景。真机验收清单含计步、音频/振动、HyperOS 后台、权限撤销（`HANDOFF-PHASE2-PLAN.md` §8）。
 
 ---
 

@@ -7,12 +7,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * M1-A3 spike: minimal empty-scenario profile collector, only so
- * `generateBaselineProfile` has a `BaselineProfileRule` journey to collect.
- * Real journeys come in a later step.
+ * M1-A3: baseline-profile collection for RingingActivity cold start
+ * (explicit component, no extras — renders the default ringing state).
  */
 @RunWith(AndroidJUnit4::class)
-class EmptyBaselineProfile {
+class RingingActivityBaselineProfile {
 
     @get:Rule val rule = BaselineProfileRule()
 
@@ -20,10 +19,12 @@ class EmptyBaselineProfile {
     fun coldStart() =
         rule.collect(
             packageName = TARGET_PACKAGE,
-            maxIterations = 3,
-            stableIterations = 2,
+            maxIterations = 5,
+            stableIterations = 3,
         ) {
             pressHome()
-            startActivityAndWait()
+            startActivityAndWait {
+                it.setClassName(packageName, "$packageName.RingingActivity")
+            }
         }
 }

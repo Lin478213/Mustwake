@@ -492,7 +492,9 @@ fun MwBottomBar(
         return
     }
 
-    NavigationBar {
+    // BUG-2: the solid branch dropped `modifier`, so the bar lost `align(BottomCenter)` from
+    // App and rendered at the content Box's topStart (over the first card). Keep the modifier.
+    NavigationBar(modifier = modifier) {
         tabs.forEachIndexed { index, tab ->
             NavigationBarItem(
                 selected = index == selectedIndex,

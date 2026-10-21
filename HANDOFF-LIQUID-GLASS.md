@@ -23,7 +23,7 @@
 | JVM 回归（**156 例 0 失败**，JUnit XML 计数） | ✅ |
 | 截图基线 **15 张全部录制**（含 shell_liquid_light 液态壳、settings_liquid_light 控件态、dialog_liquid_light 玻璃对话框） | ✅ |
 | `verifyRoborazziDebug` 连续两次全绿（其一 `--rerun-tasks` 强制实跑） | ✅ |
-| 模拟器人工核对 | 🔄 部分完成：tab 点击/拖拽拇指切换 ✅（BUG-1 修复后实测）、液态开关/滑块/±按钮渲染 ✅；对话框、按压放大、色差细节待细查 |
+| 模拟器人工核对 | ✅ 全部完成（2026-10-21 模拟器复检）：tab 切换/液态控件渲染 ✅、玻璃对话框 ✅、按压放大 78/56 ✅、色差折射 ✅、跟手高光 ✅、关开关回退无残留 ✅（过程中发现并修复 BUG-2）；与参考 demo 对照为可选项，未做 |
 | git 提交 | ✅ 已全部本地提交（见下方提交清单） |
 
 ## 提交清单（均在本地，**未推送**）
@@ -32,9 +32,12 @@
 |---|---|
 | `93f3b6a` | `feat(ui): rework liquid glass as 1:1 AndroidLiquidGlass port`（主实现，42 文件） |
 | `2d80a4d` | `fix(ui): bottom tab thumb frozen on selection change (BUG-1)` |
+| `dc4eeff` | `docs: finalize liquid glass handoff` |
+| `c583b3c` | `test(ui): add glass dialog screenshot baseline (dialog_liquid_light)` |
+| （BUG-2 修复） | `fix(ui): solid bottom bar lost its modifier and rendered at top` |
 | （更早）`6eeba11` / `812323c` / `8f42674` | M1-A3 spike / EOL chore / M1-A3 真实场景 |
 
-推送：`git push` 本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推（一次推全部 5 个）。
+推送：`git push` 本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推（一次推全部 8 个）。
 
 ## 一比一参数与移植映射（实现已落）
 
@@ -63,14 +66,22 @@ JVM/截图测试编译不了 AGSL 的 `layout(color)` 与 `shader` 类型 unifor
 - **验证**（模拟器实测）：点「历史」tab 拇指滑块随选中移动（设置→历史两张截图对比，拇指从右侧滑到中间，选中项蓝色高亮）；回归测试全绿。
 - **教训/约定**：往 `ui/design/liquid/` 组件传 getter 时必须用稳定 lambda（`remember { { state.value } }`），直接传 `{ param }` 是错的。
 
+### BUG-2 关开关后全宽底栏渲染到内容区顶部（2026-10-21 模拟器核对「关开关回退」时发现，**已修复并验证**）
+
+- **现象**：「液态玻璃」关闭后，Miuix 全宽底栏出现在**内容区顶部**（盖住第一张卡片/「权限状态」卡），底部只剩 FAB。
+- **根因**：`MwBottomBar` 固态分支写成裸 `NavigationBar { ... }`，**丢掉了 `modifier` 参数**（App 传入的 `align(Alignment.BottomCenter)` 随之丢失），在内容 Box 里落到了默认 topStart。液态分支 `Box(modifier = modifier...)` 是对的。引入于 `93f3b6a`（重构前的固态分支有 `Box(modifier = modifier.fillMaxWidth())` 包裹，重构时漏了）。
+- **修复**：`NavigationBar(modifier = modifier)`（`MwComponents.kt`，带注释）。
+- **验证**：`shell_solid_light` 基线重录（旧基线把 bug 冻进去了，verify 只保证像素稳定不保证布局正确——**录基线必须目检**）；verify ×2 全绿；模拟器实测固态底栏回到底部、内容完整。
+- **教训/约定**：分支切换的组件若外层靠 `modifier` 定位，每个分支都要显式用上 `modifier`；截图基线改动后要人眼看布局，不能只看 verify 绿。
+
 ## 未完成事项（按优先序）
 
 1. ~~确认 `settings_liquid_light` 基线已录 + verify ×2~~ **已完成**（14/14 全绿，其一 `--rerun-tasks`）。
 2. ~~**`dialog_liquid_light` 截图用例**（玻璃对话框基线）~~ **已完成**（走路线 b：经 App 壳点「替换导入」触发 `MwDialogHost`，零新增依赖；基线 15 张，verify ×2 全绿，JVM 回归 157 例 0 失败）。
    - 新坑：`performScrollTo` 后「替换导入」按钮贴在视口下边缘、被悬浮玻璃底栏盖住，合成触摸点击会被底栏截走（对话框不弹）；改用 `performSemanticsAction(SemanticsActions.OnClick)` 直接调点击语义动作绕开坐标命中。截图基线只管画面，命中测试归模拟器人工核对。
    - 另注：等待对话框出现要用「确认替换」（对话框独有），不能用「替换导入」——按钮与对话框标题同名。
-3. **模拟器人工核对（剩余项）**：tab 点击/拖拽与液态开关/滑块/±按钮已实测 ✅；还差——玻璃对话框（设置页点「替换导入」）、按压放大 78/56、色差折射与跟手高光的细部观感、关开关回退无残留、与参考 demo 对照（可选，仓库内 `AndroidLiquidGlass/androidApp` catalog 可装）。
-4. **推送**：`git push` 在本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推，一次推全部 5 个本地提交（见提交清单）。
+3. ~~**模拟器人工核对（剩余项）**~~ **已完成**（2026-10-21，截图存证）：玻璃对话框（折射下层内容、取消/确认链路、确认→SAF 选择器）✅；按压放大 78/56（tab 拇指按压约 1.4 倍）✅；色差折射（按压拇指彩虹边缘、对话框折射重影）✅；跟手高光（蓝色按钮上高光随手指从左移右）✅；关开关回退无残留（控件回 Miuix 纯色、底栏回底部；顺带发现并修复 BUG-2）✅。与参考 demo 对照（可选项）未做。
+4. **推送**：`git push` 在本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推，一次推全部本地提交（原 5 个 + 交接文档 + dialog 基线 + BUG-2 修复，共 8 个）。
 5. 小项：`MwSlider` 非玻璃态是 NumberPicker（与原一致）；`MwSliderRow` 非玻璃态是 ±步进器。响铃页按钮已是液态皮（MwSecondaryButton 自动切换）。若真机（G0）帧率差，调 `mwGlassSupported()` 降级或减 blur。
 
 ## 快速验证

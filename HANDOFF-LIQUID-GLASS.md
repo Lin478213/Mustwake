@@ -21,7 +21,7 @@
 | `ui/design/liquid/` 组件移植（8 文件，约 1200 行） | ✅ |
 | 适配层接线：MwComponents/App/SettingsScreen/AlarmEditScreen（单开关、对话框宿主、字号阶） | ✅ |
 | JVM 回归（**156 例 0 失败**，JUnit XML 计数） | ✅ |
-| 截图基线 **14 张全部录制**（含 shell_liquid_light 液态壳、settings_liquid_light 控件态） | ✅ |
+| 截图基线 **15 张全部录制**（含 shell_liquid_light 液态壳、settings_liquid_light 控件态、dialog_liquid_light 玻璃对话框） | ✅ |
 | `verifyRoborazziDebug` 连续两次全绿（其一 `--rerun-tasks` 强制实跑） | ✅ |
 | 模拟器人工核对 | 🔄 部分完成：tab 点击/拖拽拇指切换 ✅（BUG-1 修复后实测）、液态开关/滑块/±按钮渲染 ✅；对话框、按压放大、色差细节待细查 |
 | git 提交 | ✅ 已全部本地提交（见下方提交清单） |
@@ -66,9 +66,9 @@ JVM/截图测试编译不了 AGSL 的 `layout(color)` 与 `shader` 类型 unifor
 ## 未完成事项（按优先序）
 
 1. ~~确认 `settings_liquid_light` 基线已录 + verify ×2~~ **已完成**（14/14 全绿，其一 `--rerun-tasks`）。
-2. **`dialog_liquid_light` 截图用例**（玻璃对话框基线）——已留 TODO 在 `ScreenshotTests.kt`。两条路任选：
-   a) `androidApp/build.gradle.kts` 加 `testImplementation(libs.backdrop)`（或 `libs.kyant.shapes` + compose foundation）后直接截 `LiquidDialog`；
-   b) 经 App 壳 compose，点「替换导入」触发 `MwDialogHost` 再截图（不需额外依赖）。
+2. ~~**`dialog_liquid_light` 截图用例**（玻璃对话框基线）~~ **已完成**（走路线 b：经 App 壳点「替换导入」触发 `MwDialogHost`，零新增依赖；基线 15 张，verify ×2 全绿，JVM 回归 157 例 0 失败）。
+   - 新坑：`performScrollTo` 后「替换导入」按钮贴在视口下边缘、被悬浮玻璃底栏盖住，合成触摸点击会被底栏截走（对话框不弹）；改用 `performSemanticsAction(SemanticsActions.OnClick)` 直接调点击语义动作绕开坐标命中。截图基线只管画面，命中测试归模拟器人工核对。
+   - 另注：等待对话框出现要用「确认替换」（对话框独有），不能用「替换导入」——按钮与对话框标题同名。
 3. **模拟器人工核对（剩余项）**：tab 点击/拖拽与液态开关/滑块/±按钮已实测 ✅；还差——玻璃对话框（设置页点「替换导入」）、按压放大 78/56、色差折射与跟手高光的细部观感、关开关回退无残留、与参考 demo 对照（可选，仓库内 `AndroidLiquidGlass/androidApp` catalog 可装）。
 4. **推送**：`git push` 在本环境取不到凭据（ksshaskpass 报错），需用户 `! git push origin master` 自推，一次推全部 5 个本地提交（见提交清单）。
 5. 小项：`MwSlider` 非玻璃态是 NumberPicker（与原一致）；`MwSliderRow` 非玻璃态是 ±步进器。响铃页按钮已是液态皮（MwSecondaryButton 自动切换）。若真机（G0）帧率差，调 `mwGlassSupported()` 降级或减 blur。

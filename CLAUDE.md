@@ -24,7 +24,7 @@ cd /home/lin/Java/MustWake/mustwake
 ./gradlew :androidApp:assembleDebug
 # APK: androidApp/build/outputs/apk/debug/androidApp-debug.apk
 
-# 测试（当前 156 个 JVM/Robolectric 测试）
+# 测试（当前 157 个 JVM/Robolectric 测试）
 ./gradlew test                          # 全部模块
 ./gradlew :data:testDebugUnitTest       # 仅数据层
 ./gradlew :androidApp:testDebugUnitTest # 仅 app 模块

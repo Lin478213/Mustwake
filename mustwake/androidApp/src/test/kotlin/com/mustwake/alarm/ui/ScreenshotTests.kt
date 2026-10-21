@@ -9,8 +9,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -283,9 +288,42 @@ class ScreenshotTests {
         }
     }
 
-    // TODO(交接): dialog_liquid_light（玻璃对话框基线）——需要 backdrop API 在测试类路径上
-    // （androidApp testImplementation 加 io.github.kyant0:backdrop 与 compose foundation），
-    // 或经 App 壳点击「替换导入」触发 MwDialogHost 后截图。见 HANDOFF-LIQUID-GLASS.md。
+    /**
+     * Glass dialog baseline through the real [App] hosting path: the dialog is only reachable as
+     * the REPLACE-import confirmation on the settings tab, which is exactly where `MwDialogHost`
+     * renders it outside the captured layer (so the panel refracts the screen beneath).
+     *
+     * Waits on "确认替换" (dialog-only) rather than the "替换导入" title/button, which exists
+     * both behind the overlay and in the button that opens it. No extra test dependencies: the
+     * Backdrop API never crosses the test's compile surface (route (a) in HANDOFF-LIQUID-GLASS).
+     */
+    @Test
+    fun dialog_liquid_light() {
+        if (!roborazziActive()) return
+        prepareShell(glass = true)
+        captureScreen(
+            "dialog_liquid_light",
+            changeThreshold = GLASS_CHANGE_THRESHOLD,
+            waitText = "闹钟",
+            interact = {
+                composeRule.onNodeWithText("设置").performClick()
+                composeRule.waitUntil(WAIT_TIMEOUT_MS) {
+                    composeRule.onAllNodesWithText("替换导入").fetchSemanticsNodes().isNotEmpty()
+                }
+                // Scrolled into view, the button lands on the bottom edge — under the floating
+                // glass bar, so a synthetic touch would hit the bar instead. Invoke the click
+                // semantics action directly; hit-testing is emulator-verification territory.
+                composeRule.onNodeWithText("替换导入")
+                    .performScrollTo()
+                    .performSemanticsAction(SemanticsActions.OnClick) { it.invoke() }
+                composeRule.waitUntil(WAIT_TIMEOUT_MS) {
+                    composeRule.onAllNodesWithText("确认替换").fetchSemanticsNodes().isNotEmpty()
+                }
+            },
+        ) {
+            App(container = container(), actions = NOOP_ACTIONS)
+        }
+    }
 
     // ---------- helpers ----------
 
@@ -419,13 +457,15 @@ class ScreenshotTests {
 
     /**
      * Sets [content] into the compose tree, waits for [waitText] (so Room/DataStore emissions have
-     * landed), then writes the golden PNG under `src/test/screenshots/`.
+     * landed), runs [interact] (e.g. opening a dialog) if given, then writes the golden PNG under
+     * `src/test/screenshots/`.
      */
     private fun captureScreen(
         name: String,
         dark: Boolean = false,
         changeThreshold: Float = 0f,
         waitText: String,
+        interact: (() -> Unit)? = null,
         content: @Composable () -> Unit,
     ) {
         composeRule.setContent {
@@ -444,6 +484,7 @@ class ScreenshotTests {
                 .fetchSemanticsNodes()
                 .isNotEmpty()
         }
+        interact?.invoke()
         composeRule.onRoot().captureRoboImage(
             filePath = "$SCREENSHOT_DIR/$name.png",
             roborazziOptions = RoborazziOptions(

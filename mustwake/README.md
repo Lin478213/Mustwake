@@ -41,7 +41,7 @@ APK: `androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 ## Test
 
 ```bash
-./gradlew test                 # all JVM unit tests (158 tests)
+./gradlew test                 # all JVM unit tests (157 tests)
 ./gradlew :data:testDebugUnitTest
 ./gradlew :androidApp:testDebugUnitTest
 ```
